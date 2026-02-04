@@ -23,7 +23,7 @@ public class CardController {
         if (s == null) {
             throw new RuntimeException("Card not found");
         }
-
+        
         return new CardDto(
             s.snapshotId,
             s.publicId,
@@ -34,6 +34,7 @@ public class CardController {
             s.attack,
             s.health,
             s.keywords.stream().map(Enum::name).toList(),
+            s.effects,
             s.visualSignature
         );
     }
