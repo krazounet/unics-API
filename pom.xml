@@ -41,7 +41,7 @@
        <dependency>
     <groupId>com.github.krazounet</groupId>
     <artifactId>Unics</artifactId>
-    <version>v1.0.9</version>
+    <version>v1.0.10</version>
 
     <exclusions>
         <exclusion>
