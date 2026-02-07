@@ -5,12 +5,11 @@ import java.util.UUID;
 
 import unics.game.Deck;
 
-public interface DeckDao extends AutoCloseable {
+public interface DeckDao  {
 
     void insert(Deck deck);
 
     Optional<Deck> findById(UUID deckId);
 
-    @Override
-    void close();
+   
 }

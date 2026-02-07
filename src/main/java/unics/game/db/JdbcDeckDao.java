@@ -24,7 +24,14 @@ public class JdbcDeckDao implements DeckDao {
     public JdbcDeckDao() throws SQLException {
         this.connection = DbUtil.getConnection();
         this.joueurDao = new JdbcJoueurDao(connection);
-        this.cardDao = new JdbcCardSnapshotDao();
+        this.cardDao = new JdbcCardSnapshotDao(connection);
+        
+    }
+    
+    public JdbcDeckDao(Connection connection) throws SQLException {
+        this.connection = connection;
+        this.joueurDao = new JdbcJoueurDao(connection);
+        this.cardDao = new JdbcCardSnapshotDao(connection);
         
     }
 
@@ -117,15 +124,7 @@ public class JdbcDeckDao implements DeckDao {
 
     // ---------- CLOSE ----------
 
-    @Override
-    public void close() {
-        try {
-            if (connection != null && !connection.isClosed()) {
-                connection.close();
-            }
-        } catch (SQLException ignored) {
-        }
-    }
+    
 
     private void rollbackQuietly() {
         try {

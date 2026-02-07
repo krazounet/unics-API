@@ -1,4 +1,4 @@
-package unics.card_api.dao;
+package unics.api.cards.dao;
 
 import java.sql.Connection;
 import java.sql.PreparedStatement;

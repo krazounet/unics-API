@@ -1,22 +1,40 @@
-package unics.card_api;
+package unics.api.cards;
 
+import java.sql.SQLException;
 import java.util.UUID;
 
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
+import dbPG18.DbUtil;
 import dbPG18.JdbcCardSnapshotDao;
+import unics.api.cards.dto.CardDto;
 import unics.snapshot.CardSnapshot;
-import unics.card_api.dto.CardDto;
 
 @RestController
 public class CardController {
 
-    private final JdbcCardSnapshotDao snapshotDao =
-        new JdbcCardSnapshotDao();
+    private JdbcCardSnapshotDao snapshotDao;// = new JdbcCardSnapshotDao(DbUtil.getConnection());
 
-    @GetMapping("/api/cards/{snapshotId}")
+    
+    
+    
+    public CardController() {
+		super();
+		snapshotDao=null;
+		try {
+			snapshotDao=new JdbcCardSnapshotDao(DbUtil.getConnection());
+		} catch (SQLException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+	}
+
+
+
+
+	@GetMapping("/api/cards/{snapshotId}")
     public CardDto getCard(@PathVariable UUID snapshotId) {
 
         CardSnapshot s = snapshotDao.findById(snapshotId);

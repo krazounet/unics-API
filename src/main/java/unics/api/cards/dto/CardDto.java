@@ -1,4 +1,4 @@
-package unics.card_api.dto;
+package unics.api.cards.dto;
 
 import java.util.List;
 import java.util.UUID;

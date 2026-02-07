@@ -1,4 +1,4 @@
-package unics.card_api;
+package unics.api.cards;
 
 import java.awt.image.BufferedImage;
 import java.io.File;
@@ -6,6 +6,7 @@ import java.io.InputStream;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.Paths;
+import java.sql.Connection;
 import java.util.UUID;
 
 import javax.imageio.ImageIO;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.RestController;
 
 import aiGenerated.CardRender;
 import aiGenerated.RenderProfile;
+import dbPG18.DbUtil;
 import dbPG18.JdbcCardRenderDao;
 import dbPG18.JdbcCardSnapshotDao;
 import unics.godot.RenderBackCard;
@@ -59,8 +61,9 @@ public class CardImageController {
             // ─────────────────────────────
             // 1. Charger le snapshot
             // ─────────────────────────────
+        	Connection conn = DbUtil.getConnection();
             JdbcCardSnapshotDao snapshotDao =
-                new JdbcCardSnapshotDao();
+                new JdbcCardSnapshotDao(conn);
 
             CardSnapshot snapshot =
                 snapshotDao.findById(snapshotId);
@@ -100,7 +103,7 @@ public class CardImageController {
             // 4. Charger le render (illustration)
             // ─────────────────────────────
             JdbcCardRenderDao renderDao =
-                new JdbcCardRenderDao();
+                new JdbcCardRenderDao(conn);
 
             CardRender render =
                 renderDao.findByVisualSignature(
