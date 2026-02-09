@@ -30,7 +30,10 @@
     </repositories>
 
     <dependencies>
-
+		<dependency>
+    <groupId>com.fasterxml.jackson.datatype</groupId>
+    <artifactId>jackson-datatype-jsr310</artifactId>
+</dependency>
         <!-- Spring Web -->
         <dependency>
             <groupId>org.springframework.boot</groupId>
@@ -41,7 +44,7 @@
        <dependency>
     <groupId>com.github.krazounet</groupId>
     <artifactId>Unics</artifactId>
-    <version>v1.0.10</version>
+    <version>v1.0.11</version>
 
     <exclusions>
         <exclusion>

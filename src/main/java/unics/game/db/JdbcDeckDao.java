@@ -121,7 +121,44 @@ public class JdbcDeckDao implements DeckDao {
         }
     }
 
+    /**
+     * renvoie le premier deck de owner
+     * @param ownerId
+     * @return
+     */
+    public Optional<Deck> findFirstByOwner(UUID ownerId) {
 
+        String sql = """
+            SELECT id
+            FROM deck
+            WHERE owner_id = ?
+            ORDER BY created_at ASC
+            LIMIT 1
+        """;
+
+        try (PreparedStatement ps = connection.prepareStatement(sql)) {
+
+            ps.setObject(1, ownerId);
+            ResultSet rs = ps.executeQuery();
+
+            if (!rs.next()) {
+                return Optional.empty();
+            }
+
+            UUID deckId = (UUID) rs.getObject("id");
+            return findById(deckId);
+
+        } catch (SQLException e) {
+            throw new RuntimeException(
+                "Failed to find first deck for owner " + ownerId,
+                e
+            );
+        }
+    }
+
+    
+    
+    
     // ---------- CLOSE ----------
 
     
