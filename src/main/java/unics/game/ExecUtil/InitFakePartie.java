@@ -120,7 +120,7 @@ public class InitFakePartie {
 
         JoueurPartie jp = new JoueurPartie();
         jp.setOwner(joueur);
-        jp.setDeck_initial(deck); 
+        jp.setDeck_initial(deck.getId_deck()); 
 
         jp.setHp(20); 
         jp.setMana_dispo(1);

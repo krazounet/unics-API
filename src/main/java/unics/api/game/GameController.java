@@ -23,7 +23,7 @@ public class GameController {
     @GetMapping("/{partieId}")
     public GameView getGame(
             @PathVariable UUID partieId,
-            @RequestHeader(value = "X-PLAYER-ID", required = false) UUID playerId
+            @RequestHeader(value = "X-PLAYER-UUID", required = false) UUID playerId
     ) {
         GameState state = gameService.loadGameState(partieId);
         return StateProjector.project(state, playerId);

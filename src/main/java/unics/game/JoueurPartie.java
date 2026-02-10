@@ -2,12 +2,13 @@ package unics.game;
 
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 import unics.snapshot.CardSnapshot;
 
 public class JoueurPartie {
 	private Joueur owner;
-	private Deck deck_initial;
+	private UUID deck_initial;
 	private int hp;
 	private int mana_dispo;
 	private List<CardSnapshot> main;
@@ -26,7 +27,7 @@ public class JoueurPartie {
 
 
 
-	public void setDeck_initial(Deck deck_initial) {
+	public void setDeck_initial(UUID deck_initial) {
 		this.deck_initial = deck_initial;
 	}
 
@@ -89,7 +90,7 @@ public class JoueurPartie {
 
 
 
-	public Deck getDeck_initial() {
+	public UUID getDeck_initial() {
 		return deck_initial;
 	}
 

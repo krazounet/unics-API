@@ -25,21 +25,21 @@ public class StateProjector {
             // spectateur
             return view;
         }
-        if ((viewerId != state.J1.getOwner().getId_joueur())&&(viewerId != state.J2.getOwner().getId_joueur())) {
-            // ni j1 ni j2
-            return view;
-        }
-        JoueurPartie me;
-        JoueurPartie opp;
-        if (viewerId == state.J1.getOwner().getId_joueur()) {
-        	//je suis J1
-        	me = state.J1;
-        	opp =state.J2;		
-        }
-        else {
-        	me = state.J2;
-        	opp =state.J1;
-        }
+        if (!viewerId.equals(state.J1.getOwner().getId_joueur())
+        		 && !viewerId.equals(state.J2.getOwner().getId_joueur())) {
+        		    return view;
+        		}
+
+        		JoueurPartie me;
+        		JoueurPartie opp;
+
+        		if (viewerId.equals(state.J1.getOwner().getId_joueur())) {
+        		    me = state.J1;
+        		    opp = state.J2;
+        		} else {
+        		    me = state.J2;
+        		    opp = state.J1;
+        		}
         
         /*
         JoueurPartie me = state.joueurs.get(viewerId.toString());
