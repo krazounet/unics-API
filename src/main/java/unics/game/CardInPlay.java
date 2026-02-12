@@ -14,7 +14,7 @@ public class CardInPlay {
 
 	    public Map<String, Integer>  effects; // STRING du gere, dégat, debuff, etc... Integer : intensité
 	
-	    enum Inclinaison {
+	    public enum Inclinaison {
 		    DROIT,
 		    TRAVERS,
 		    COUCHE

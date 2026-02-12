@@ -23,6 +23,8 @@ public class StateProjector {
         
         if (viewerId == null) {
             // spectateur
+        	view.me = projectOpponent(state.J1);
+            view.opponent = projectOpponent(state.J2);
             return view;
         }
         if (!viewerId.equals(state.J1.getOwner().getId_joueur())

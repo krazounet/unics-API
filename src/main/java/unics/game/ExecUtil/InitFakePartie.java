@@ -57,15 +57,24 @@ public class InitFakePartie {
             JoueurPartie jp1 = initJoueurPartie(j1, d1, rng);
             JoueurPartie jp2 = initJoueurPartie(j2, d2, rng);
 
+         // Mettre une carte chez J2 aussi
+            if (!jp2.getMain().isEmpty()) {
+                CardSnapshot snap = jp2.getMain().get(0);
+
+                CardInPlay cardInPlay = toCardInPlay(
+                        snap,
+                        CardInPlay.Inclinaison.COUCHE
+                );
+
+                jp2.getPlateau().put(JoueurPartie.Slot.RIGHT, cardInPlay);
+            }
+            
+            
             GameState gameState = new GameState();
             
             gameState.J1 = jp1;
             gameState.J2 = jp2;
-            /*
-            gameState.joueurs = Map.of(
-                j1.getId_joueur(), jp1,
-                j2.getId_joueur(), jp2
-            );*/
+            
             
             gameState.log = new ArrayList<>();
             gameState.etat_partie = EtatPartie.MULLIGAN;
@@ -134,9 +143,33 @@ public class InitFakePartie {
         	plateau.put(slot, null);
         }
         jp.setPlateau(plateau);
+        
+        if (!main.isEmpty()) {
+            CardSnapshot snap = main.get(0);
+
+            CardInPlay cardInPlay = toCardInPlay(
+                    snap,
+                    CardInPlay.Inclinaison.TRAVERS
+            );
+
+            jp.getPlateau().put(JoueurPartie.Slot.LEFT, cardInPlay);
+
+            // Optionnel : retirer de la main pour cohérence
+            main.remove(0);
+        }
 
         jp.setCompteurs(new HashMap<>()); 
 
         return jp;
+    }
+    private static CardInPlay toCardInPlay(CardSnapshot snapshot, CardInPlay.Inclinaison inclinaison) {
+        CardInPlay cip = new CardInPlay();
+        cip.instanceId = UUID.randomUUID();
+        cip.snapshotId = snapshot.snapshotId;
+        cip.attack = snapshot.attack;
+        cip.health = snapshot.health;
+        cip.exhausted = inclinaison;
+        cip.effects = new HashMap<>();
+        return cip;
     }
 }
