@@ -59,6 +59,10 @@ public class StateProjector {
 
     private static PlayerView projectMe(JoueurPartie jp) {
         PlayerView v = new PlayerView();
+        
+        v.id = jp.getOwner().getId_joueur().toString();
+        v.nom = jp.getOwner().getPseudo(); 
+        
         v.hp = jp.getHp();
         v.mana = jp.getMana_dispo();
         v.main = jp.getMain();
@@ -73,6 +77,8 @@ public class StateProjector {
         if (jp == null) return null;
 
         PlayerView v = new PlayerView();
+        v.id = jp.getOwner().getId_joueur().toString();
+        v.nom = jp.getOwner().getPseudo();
         v.hp = jp.getHp();
         v.mana = jp.getMana_dispo();
         v.main = null;                         // ❌ cachée

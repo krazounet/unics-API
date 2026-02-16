@@ -10,6 +10,9 @@ import unics.snapshot.CardSnapshot;
 
 public class PlayerView {
 
+	public String id;
+	public String nom;
+	
     public int hp;
     public int mana;
 
