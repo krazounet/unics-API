@@ -43,17 +43,10 @@ public class StateProjector {
         		    opp = state.J1;
         		}
         
-        /*
-        JoueurPartie me = state.joueurs.get(viewerId.toString());
-        JoueurPartie opp = state.joueurs.values()
-                .stream()
-                .filter(jp -> !jp.owner.getId_joueur().equals(viewerId))
-                .findFirst()
-                .orElse(null);
-		*/
+ 
         view.me = projectMe(me);
         view.opponent = projectOpponent(opp);
-
+        view.logs = state.log;
         return view;
     }
 

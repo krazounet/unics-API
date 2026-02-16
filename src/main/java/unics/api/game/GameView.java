@@ -2,7 +2,10 @@ package unics.api.game;
 
 
 
+import java.util.List;
 import java.util.UUID;
+
+import unics.game.LogEvent;
 
 public class GameView {
 
@@ -15,4 +18,6 @@ public class GameView {
 
     public PlayerView me;
     public PlayerView opponent;
+    
+    public List<LogEvent> logs;
 }
