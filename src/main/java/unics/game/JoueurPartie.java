@@ -1,5 +1,6 @@
 package unics.game;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -18,6 +19,29 @@ public class JoueurPartie {
 	private Map<String, Integer> compteurs;
 	
 	
+	public boolean hasCardInHand(String uuid_card) {
+		for(CardSnapshot card : main) {
+			if (card.snapshotId.toString().equals(uuid_card)) return true;
+		}
+		for(CardSnapshot card : main) {
+			System.out.println(">>"+card.cardId.toString()+"<<");
+		
+		}
+		return false;
+	}
+	
+	public void piocheXcartes(int nb_a_piocher) {
+		if (nb_a_piocher <= 0 || deck.isEmpty()) {
+	        return;
+	    }
+		if (nb_a_piocher > deck.size()) {
+			nb_a_piocher = deck.size();
+		}
+		List<CardSnapshot> sousListe = new ArrayList<>(deck.subList(0, nb_a_piocher));
+
+	    main.addAll(sousListe);
+	    deck.subList(0, nb_a_piocher).clear();
+	}
 	
 	
 	public void setOwner(Joueur owner) {
@@ -151,5 +175,10 @@ public class JoueurPartie {
 	    CENTER,
 	    RIGHT
 	}
+
+
+
+
+	
 	
 }

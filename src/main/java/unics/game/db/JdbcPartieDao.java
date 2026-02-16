@@ -96,7 +96,10 @@ public class JdbcPartieDao {
             partie.setStep(rs.getInt("step")); 
 
             String payload = rs.getString("payload");
-            partie.setGamestate(MAPPER.readValue(payload, GameState.class)); 
+            GameState gs = MAPPER.readValue(payload, GameState.class);
+            partie.setJ1(gs.J1);
+            partie.setJ2(gs.J2);
+            partie.setGamestate(gs); 
 
             return Optional.of(partie);
 

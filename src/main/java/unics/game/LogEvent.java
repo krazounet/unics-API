@@ -1,7 +1,12 @@
 package unics.game;
 
-public class LogEvent {
+import java.util.List;
 
-	String texte;
-	
-}
+public record LogEvent(
+	    String texte_fr,
+	    String texte_en,
+	    String uuid_joueur_source,
+	    String uuid_joueur_cible,
+	    String uuid_carte_source,
+	    List<String> uuid_cartes_cibles
+	) {}

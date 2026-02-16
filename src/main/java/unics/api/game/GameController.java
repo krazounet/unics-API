@@ -38,7 +38,7 @@ public class GameController {
     ) {
     	return gameService.loadGameState(partieId);
     }
-    @PostMapping("/api/game/{gameId}/mulligan")
+    @PostMapping("/{gameId}/mulligan")
     public ResponseEntity<GameState> mulligan(
             @PathVariable String gameId,
             @RequestBody MulliganRequest request

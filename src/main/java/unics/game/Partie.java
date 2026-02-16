@@ -94,8 +94,29 @@ public class Partie {
 	public void setStep(int step) {
 		this.step = step;
 	}
+	public void advanceIfBothMulliganed(JoueurPartie joueur) {
+		//test si J1 et J2 ont mulligan
+		step++;
+		
+		if (joueur == J1) { //alors on demande à J2
+			updateJoueurActif(J2.getOwner().getId_joueur());
+			
+		}else {//Si c'est J2 => go phase suivante
+			updateJoueurActif(J1.getOwner().getId_joueur());
+			phase_partie	=	PhasePartie.PLAY_CARDS;
+			etat_partie		= 	EtatPartie.RUNNING;
+			
+		}
+
+		
+
+		
+	}
 	
-	
+	public void updateJoueurActif(UUID id_joueur_actif) {
+		joueur_actif = id_joueur_actif;
+		gamestate.joueur_actif = id_joueur_actif;
+	}
 	
 	
 }
