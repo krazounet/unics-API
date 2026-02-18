@@ -69,24 +69,28 @@ public class Partie {
 	}
 	public void setEtat_partie(EtatPartie etat_partie) {
 		this.etat_partie = etat_partie;
+		gamestate.etat_partie = etat_partie;
 	}
 	public PhasePartie getPhase_partie() {
 		return phase_partie;
 	}
 	public void setPhase_partie(PhasePartie phase_partie) {
 		this.phase_partie = phase_partie;
+		gamestate.phase_partie = phase_partie;
 	}
 	public UUID getJoueur_actif() {
 		return joueur_actif;
 	}
 	public void setJoueur_actif(UUID joueur_actif) {
 		this.joueur_actif = joueur_actif;
+		gamestate.joueur_actif = joueur_actif;
 	}
 	public int getTour() {
 		return tour;
 	}
 	public void setTour(int tour) {
 		this.tour = tour;
+		gamestate.tour = tour;
 	}
 	public int getStep() {
 		return step;
@@ -96,8 +100,7 @@ public class Partie {
 	}
 	public void advanceIfBothMulliganed(JoueurPartie joueur) {
 		//test si J1 et J2 ont mulligan
-		step++;
-		gamestate.step++;
+		increaseStep();
 		if (joueur == J1) { //alors on demande à J2
 			updateJoueurActif(J2.getOwner().getId_joueur());
 			
@@ -123,6 +126,10 @@ public class Partie {
 	public void updateJoueurActif(UUID id_joueur_actif) {
 		joueur_actif = id_joueur_actif;
 		gamestate.joueur_actif = id_joueur_actif;
+	}
+	public void increaseStep() {
+		step++;
+		gamestate.step++;
 	}
 	
 	

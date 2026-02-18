@@ -183,7 +183,9 @@ public class JoueurPartie {
 	    RIGHT
 	}
 
-
+	public void retireMana(int nb) {
+		mana_dispo=mana_dispo-nb;
+	}
 
 
 	

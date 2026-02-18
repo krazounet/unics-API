@@ -77,6 +77,7 @@ public class InitFakePartie {
             
             
             gameState.log = new ArrayList<>();
+            gameState.effects_to_resolve = new ArrayList<>();
             gameState.etat_partie = EtatPartie.MULLIGAN;
             gameState.phase_partie = PhasePartie.TURN_START;
             gameState.step = 0;

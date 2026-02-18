@@ -20,4 +20,5 @@ public class GameView {
     public PlayerView opponent;
     
     public List<LogEvent> logs;
+    public EffectToResolve current_effect;
 }

@@ -20,6 +20,7 @@ public class StateProjector {
         view.joueurActif = state.joueur_actif;
         view.tour = state.tour;
         view.step = state.step;
+        view.current_effect = state.getCurrentEffect();
         
         if (viewerId == null) {
             // spectateur

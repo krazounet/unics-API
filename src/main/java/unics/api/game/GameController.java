@@ -61,11 +61,23 @@ public class GameController {
         GameState updatedGame = gameService.handlePlayCard(
                 gameId,
                 request.getPlayerId(),
-                request.getCard(),
+                request.getCardId(),
                 request.getPosition()
         );
 
         return ResponseEntity.ok(updatedGame);
+    }
+    @PostMapping("/{gameId}/end-play")
+    public ResponseEntity<GameState> endPlay(
+            @PathVariable String gameId,
+            @RequestBody EndPlayRequest request
+    ) {
+        return ResponseEntity.ok(
+            gameService.handleEndPlayPhase(
+                gameId,
+                request.getPlayerId()
+            )
+        );
     }
 }
 

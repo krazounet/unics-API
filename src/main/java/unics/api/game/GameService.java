@@ -2,7 +2,6 @@ package unics.api.game;
 
 
 
-import java.sql.Connection;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -10,10 +9,13 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
-import dbPG18.DbUtil;
+import unics.Enum.CardType;
+import unics.Enum.TriggerType;
+import unics.api.cards.CardSnapshotService;
 import unics.game.CardInPlay;
 import unics.game.EtatPartie;
 import unics.game.GameState;
@@ -24,21 +26,25 @@ import unics.game.Partie;
 import unics.game.PhasePartie;
 import unics.game.db.JdbcPartieDao;
 import unics.snapshot.CardSnapshot;
+import unics.snapshot.EffectSnapshot;
 
 @Service
 public class GameService {
 
-	public Partie loadPartie(UUID partieID) {
-		try (Connection connection = DbUtil.getConnection()) {
-            JdbcPartieDao partieDao = new JdbcPartieDao(connection);
-            Partie partie = partieDao.findById(partieID)
-                    .orElseThrow(() ->
-                        new GameActionException("Partie introuvable : " + partieID)
-                    );
-            return partie;
-		} catch (Exception e) {
-            throw new RuntimeException("Failed to load game" + partieID, e);
-        }
+	private final CardSnapshotService cardSnapshotService;
+	private final JdbcPartieDao partieDao;
+
+	public GameService(CardSnapshotService cardSnapshotService,
+            JdbcPartieDao partieDao) {
+		this.cardSnapshotService = cardSnapshotService;
+		this.partieDao = partieDao;
+	}
+	
+	private Partie loadPartie(UUID partieID) {
+	    return partieDao.findById(partieID)
+	            .orElseThrow(() ->
+	                new GameActionException("Partie introuvable : " + partieID)
+	            );
 	}
 	
     public GameState loadGameState(UUID partieId) {
@@ -114,14 +120,7 @@ public class GameService {
 		partie.getGamestate().log.add(log);
 		
 		//9  sauvegarde partie
-		try (Connection connection = DbUtil.getConnection()) {
-
-            JdbcPartieDao partieDao = new JdbcPartieDao(connection);
-            partieDao.update(partie);
-            
-		} catch (Exception e) {
-            throw new RuntimeException("Failed to update game" , e);
-        }
+		partieDao.update(partie);
 		
 		//10 on retourne le gamestate
 		return partie.getGamestate();
@@ -146,12 +145,15 @@ public class GameService {
 	    }
 		//4 Vérifier que les cartes sont dans la main
 		JoueurPartie joueur = null;
+		JoueurPartie opposant = null;
 		if (uuid_joueur_actif.equals(partie.getJ1().getOwner().getId_joueur())) {
 		//System.out.println("J1");
-			joueur = partie.getJ1();
+			joueur 	= partie.getJ1();
+			opposant= partie.getJ2();
 		}else {
 		//System.out.println("J2");
 			joueur = partie.getJ2();
+			opposant= partie.getJ1();
 		}
 		CardSnapshot snap = joueur.getCardFromHandByUuid(UUID.fromString(card_uuid));
 		if (snap==null) {
@@ -165,32 +167,148 @@ public class GameService {
 		
 				
 		//6 verif assez mana
-		
+		if (snap.cost > joueur.getMana_dispo()) throw new GameActionException("NOTMANA");
 		
 		//7 verif type != action
+		if (snap.type == CardType.ACTION) throw new GameActionException("CARTE ACTION NOT IN SLOT");
 		
 		//8 retrait main
+		joueur.getMain().remove(snap);
 		
 		//9 ajout plateau
+		//=> je dois creer une cardInPlay qui correspond au snap
+		joueur.getPlateau().put(slot, new CardInPlay(snap));
 		
-		//10 check trigger
-		
-		//11 Passer à la phase suivante // si aucune carte dispo, ni slot
+		//10retrait mana
+		joueur.retireMana(snap.cost); 
 		
 		//12 log event
+		LogEvent log = new LogEvent(joueur.getOwner().getPseudo()+" a joué "+snap.name+" à "+position,"en",joueur.getOwner().getId_joueur().toString(),"",snap.snapshotId.toString(),null);
+		partie.getGamestate().log.add(log);
+		
+		//10 check trigger
+		checkTrigger(new ArrayList<TriggerType>(List.of(
+												TriggerType.ON_ENTER, 
+												TriggerType.ON_PLAY, 
+												TriggerType.ON_ALLIED_UNIT_ENTERS												
+											)),
+					partie,
+					joueur,opposant,
+					snap);
+		
+		//11 Passer à la phase suivante // si aucune carte dispo, ni slot
+		if (partie.getGamestate().getCurrentEffect() != null) {
+			partie.getGamestate().etat_partie = EtatPartie.RESOLVE_EFFECT;
+			partie.setEtat_partie(EtatPartie.RESOLVE_EFFECT);
+		}
+		
+		//12maj step
+		partie.increaseStep();
 		
 		//13 save game
-		try (Connection connection = DbUtil.getConnection()) {
-
-            JdbcPartieDao partieDao = new JdbcPartieDao(connection);
-            partieDao.update(partie);
-            
-		} catch (Exception e) {
-            throw new RuntimeException("Failed to update game" , e);
-        }
+		partieDao.update(partie);
 		
 		
 		//20 on retourne le gamestate
 		return partie.getGamestate();
 	}
+	
+	public GameState handleEndPlayPhase(String gameId, String playerId) {
+
+	    Partie partie = loadPartie(UUID.fromString(gameId));
+
+	    UUID uuid_joueur_actif = UUID.fromString(playerId);
+
+	    if (!uuid_joueur_actif.equals(partie.getJoueur_actif())) {
+	        throw new GameActionException("Not active player");
+	    }
+
+	    if (partie.getPhase_partie() != PhasePartie.PLAY_CARDS) {
+	        throw new GameActionException("Not in PLAY_CARDS phase");
+	    }
+	    
+	    partie.increaseStep();
+			//partie.updateJoueurActif(joueur.getOwner().getId_joueur());
+			partie.setPhase_partie(PhasePartie.ATTACK_LEFT);	
+			partie.setEtat_partie(EtatPartie.RUNNING);
+			
+	    partieDao.update(partie);
+
+	    return partie.getGamestate();
+	}
+
+	
+	
+	/***
+	 * test pour chaque trigger, qui quoi, pourqoi
+	 * @param triggers
+	 * @param partie
+	 * @param joueur
+	 * @param snap
+	 */
+	private void checkTrigger(ArrayList<TriggerType> triggers, Partie partie, JoueurPartie joueur,JoueurPartie opposant ,CardSnapshot carte_jouee) {
+		for(TriggerType trigger : triggers) {
+			switch (trigger) {
+			case TriggerType.ON_PLAY :
+				//seule la carte jouée est testée
+				for(EffectSnapshot ES : getEffectsByTrigger(carte_jouee,TriggerType.ON_PLAY)) {
+					EffectToResolve etr = new EffectToResolve(ES,carte_jouee.snapshotId,joueur.getOwner().getId_joueur());
+					partie.getGamestate().effects_to_resolve.add(etr);
+				}
+				
+				break;
+			case TriggerType.ON_ENTER :
+				//seule la carte jouée est testée
+				for(EffectSnapshot ES : getEffectsByTrigger(carte_jouee,TriggerType.ON_ENTER)) {
+					EffectToResolve etr = new EffectToResolve(ES,carte_jouee.snapshotId,joueur.getOwner().getId_joueur());
+					partie.getGamestate().effects_to_resolve.add(etr);
+				}
+				break;
+			case TriggerType.ON_ALLIED_UNIT_ENTERS :
+				//On teste les autres cartes du plateau joueur
+				for(CardInPlay cip : joueur.getPlateau().values()) {
+					//cip peut être null car une case de plateau vide contient cip null
+					if (cip == null) {
+				        continue;
+				    }
+					//j'exlue la carte qui a été jouée des tess
+					if (!cip.snapshotId.equals(carte_jouee.snapshotId)) {
+						continue;
+					}
+						//donc ici j'ai potentiellement 2 cartes
+						CardSnapshot snapshot = cardSnapshotService.getById(cip.snapshotId);
+						for(EffectSnapshot ES : getEffectsByTrigger(snapshot,TriggerType.ON_PLAY)) {
+							EffectToResolve etr = new EffectToResolve(ES,cip.snapshotId,joueur.getOwner().getId_joueur());
+							partie.getGamestate().effects_to_resolve.add(etr);
+						}
+						
+					
+				}
+				
+				break;
+			default:
+				throw new GameActionException("TRIGGER NON GERE");
+			}
+			
+			
+		}
+		
+	}
+	/**
+	 * renvoie les effect Snapshot d'un CardSnapshot qui match avec le Trigger
+	 * @param cardSnapshot
+	 * @param triggerType
+	 * @return
+	 */
+	private List<EffectSnapshot> getEffectsByTrigger(CardSnapshot cardSnapshot, TriggerType triggerType) {
+	    if (cardSnapshot == null || cardSnapshot.effects == null) {
+	        return Collections.emptyList();
+	    }
+
+	    return cardSnapshot.effects
+	            .stream()
+	            .filter(effect -> effect.trigger == triggerType)
+	            .collect(Collectors.toList());
+	}
+	
 }
