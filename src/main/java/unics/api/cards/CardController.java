@@ -1,5 +1,6 @@
 package unics.api.cards;
 
+import java.sql.Connection;
 import java.sql.SQLException;
 import java.util.UUID;
 
@@ -15,45 +16,50 @@ import unics.snapshot.CardSnapshot;
 @RestController
 public class CardController {
 
-    private JdbcCardSnapshotDao snapshotDao;// = new JdbcCardSnapshotDao(DbUtil.getConnection());
+    //private JdbcCardSnapshotDao snapshotDao;// = new JdbcCardSnapshotDao(DbUtil.getConnection());
 
     
     
     
     public CardController() {
 		super();
-		snapshotDao=null;
-		try {
-			snapshotDao=new JdbcCardSnapshotDao(DbUtil.getConnection());
-		} catch (SQLException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		
 	}
 
 
 
 
-	@GetMapping("/api/cards/{snapshotId}")
+    @GetMapping("/api/cards/{snapshotId}")
     public CardDto getCard(@PathVariable UUID snapshotId) {
 
-        CardSnapshot s = snapshotDao.findById(snapshotId);
-        if (s == null) {
-            throw new RuntimeException("Card not found");
+        try (Connection conn = DbUtil.getConnection()) {
+
+            JdbcCardSnapshotDao snapshotDao =
+                new JdbcCardSnapshotDao(conn);
+
+            CardSnapshot s = snapshotDao.findById(snapshotId);
+
+            if (s == null) {
+                throw new RuntimeException("Card not found");
+            }
+
+            return new CardDto(
+                s.snapshotId,
+                s.publicId,
+                s.name,
+                s.type.name(),
+                s.faction.name(),
+                s.cost,
+                s.attack,
+                s.health,
+                s.keywords.stream().map(Enum::name).toList(),
+                s.effects,
+                s.visualSignature
+            );
+
+        } catch (SQLException e) {
+            throw new RuntimeException(e);
         }
-        
-        return new CardDto(
-            s.snapshotId,
-            s.publicId,
-            s.name,
-            s.type.name(),
-            s.faction.name(),
-            s.cost,
-            s.attack,
-            s.health,
-            s.keywords.stream().map(Enum::name).toList(),
-            s.effects,
-            s.visualSignature
-        );
     }
+
 }

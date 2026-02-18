@@ -52,5 +52,20 @@ public class GameController {
 
         return ResponseEntity.ok(updatedGame);
     }
+    @PostMapping("/{gameId}/play")
+    public ResponseEntity<GameState> play(
+            @PathVariable String gameId,
+            @RequestBody PlayRequest request
+    ) {
+    	//{"cardId":"2da5e822-65f2-43d1-aff0-ab0576316acf","playerId":"45ca93a9-4a52-4d1c-be38-87b5341e5788","position":"RIGHT"}
+        GameState updatedGame = gameService.handlePlayCard(
+                gameId,
+                request.getPlayerId(),
+                request.getCard(),
+                request.getPosition()
+        );
+
+        return ResponseEntity.ok(updatedGame);
+    }
 }
 

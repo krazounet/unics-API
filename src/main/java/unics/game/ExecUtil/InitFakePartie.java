@@ -79,8 +79,8 @@ public class InitFakePartie {
             gameState.log = new ArrayList<>();
             gameState.etat_partie = EtatPartie.MULLIGAN;
             gameState.phase_partie = PhasePartie.TURN_START;
-            gameState.step = 12;
-            gameState.tour = 1;
+            gameState.step = 0;
+            gameState.tour = 0;
             gameState.joueur_actif = jp1.getOwner().getId_joueur();
             
             UUID partie_id = UUID.randomUUID();
@@ -96,8 +96,8 @@ public class InitFakePartie {
             partie.setEtat_partie(EtatPartie.MULLIGAN);
             partie.setPhase_partie(PhasePartie.TURN_START);
             partie.setJoueur_actif(j1.getId_joueur()); 
-            partie.setTour(1);
-            partie.setStep(12); 
+            partie.setTour(0);
+            partie.setStep(0); 
             partie.setGamestate(gameState); 
 
             partieDao.insert(partie);

@@ -14,11 +14,14 @@ import java.util.UUID;
 import org.springframework.stereotype.Service;
 
 import dbPG18.DbUtil;
+import unics.game.CardInPlay;
 import unics.game.EtatPartie;
 import unics.game.GameState;
 import unics.game.JoueurPartie;
+import unics.game.JoueurPartie.Slot;
 import unics.game.LogEvent;
 import unics.game.Partie;
+import unics.game.PhasePartie;
 import unics.game.db.JdbcPartieDao;
 import unics.snapshot.CardSnapshot;
 
@@ -27,12 +30,10 @@ public class GameService {
 
 	public Partie loadPartie(UUID partieID) {
 		try (Connection connection = DbUtil.getConnection()) {
-
             JdbcPartieDao partieDao = new JdbcPartieDao(connection);
-
             Partie partie = partieDao.findById(partieID)
                     .orElseThrow(() ->
-                        new IllegalStateException("Partie introuvable : " + partieID)
+                        new GameActionException("Partie introuvable : " + partieID)
                     );
             return partie;
 		} catch (Exception e) {
@@ -43,22 +44,7 @@ public class GameService {
     public GameState loadGameState(UUID partieId) {
 
     	return loadPartie(partieId).getGamestate();
-    	/*
-        try (Connection connection = DbUtil.getConnection()) {
-
-            JdbcPartieDao partieDao = new JdbcPartieDao(connection);
-
-            Partie partie = partieDao.findById(partieId)
-                    .orElseThrow(() ->
-                        new IllegalStateException("Partie introuvable : " + partieId)
-                    );
-
-            return partie.getGamestate();
-
-        } catch (Exception e) {
-            throw new RuntimeException("Failed to load game state " + partieId, e);
-        }
-        */
+    	
     }
 
 	public GameState handleMulligan(String gameId, String playerId, List<String> cards) {
@@ -69,12 +55,12 @@ public class GameService {
 		//2 verif que l'envoyeur est bien le joueur actif
 		UUID uuid_joueur_actif = UUID.fromString(playerId);
 		if (!uuid_joueur_actif.equals(partie.getJoueur_actif())) {
-			throw new IllegalStateException("joueur actif != playerid");
+			throw new GameActionException("joueur actif != playerid");
 		}
 
 		//3 verifier phase / etat
 		if (partie.getEtat_partie() != EtatPartie.MULLIGAN) {
-	        throw new IllegalStateException("Not in mulligan phase : "+partie.getEtat_partie());
+	        throw new GameActionException("Not in mulligan phase : "+partie.getEtat_partie());
 	    }
 		
 		//4 Vérifier que les cartes sont dans la main
@@ -91,7 +77,7 @@ public class GameService {
 		
 		for (String cardId : cards) {
 		    if (!joueur.hasCardInHand(cardId)) {
-		        throw new IllegalArgumentException("Card not in hand : "+cardId+"main : "+joueur.getMain());
+		        throw new GameActionException("Card not in hand : "+cardId+"main : "+joueur.getMain());
 		    }
 		}
 		
@@ -141,5 +127,70 @@ public class GameService {
 		return partie.getGamestate();
 		    
 		
+	}
+
+	public GameState handlePlayCard(String gameId, String playerId, String card_uuid, String position) {
+		//1 recupérer la game ou le GameState
+		
+		Partie partie = loadPartie(UUID.fromString(gameId));
+				
+		//2 verif que l'envoyeur est bien le joueur actif
+		UUID uuid_joueur_actif = UUID.fromString(playerId);
+		if (!uuid_joueur_actif.equals(partie.getJoueur_actif())) {
+			throw new GameActionException("joueur actif != playerid");
+		}
+
+		//3 verifier phase / etat
+		if (partie.getPhase_partie() != PhasePartie.PLAY_CARDS) {
+			throw new GameActionException("Not in play phase : "+partie.getPhase_partie());
+	    }
+		//4 Vérifier que les cartes sont dans la main
+		JoueurPartie joueur = null;
+		if (uuid_joueur_actif.equals(partie.getJ1().getOwner().getId_joueur())) {
+		//System.out.println("J1");
+			joueur = partie.getJ1();
+		}else {
+		//System.out.println("J2");
+			joueur = partie.getJ2();
+		}
+		CardSnapshot snap = joueur.getCardFromHandByUuid(UUID.fromString(card_uuid));
+		if (snap==null) {
+		    throw new GameActionException("Card not in hand : "+card_uuid+" main : "+joueur.getMain());
+		}
+		
+		//5 verif slot vide
+		Slot slot = Slot.valueOf(position);
+		CardInPlay cip = joueur.getPlateau().get(slot);
+		if (cip != null) throw new GameActionException("Slot oqp : "+slot+" card : "+cip.snapshotId);
+		
+				
+		//6 verif assez mana
+		
+		
+		//7 verif type != action
+		
+		//8 retrait main
+		
+		//9 ajout plateau
+		
+		//10 check trigger
+		
+		//11 Passer à la phase suivante // si aucune carte dispo, ni slot
+		
+		//12 log event
+		
+		//13 save game
+		try (Connection connection = DbUtil.getConnection()) {
+
+            JdbcPartieDao partieDao = new JdbcPartieDao(connection);
+            partieDao.update(partie);
+            
+		} catch (Exception e) {
+            throw new RuntimeException("Failed to update game" , e);
+        }
+		
+		
+		//20 on retourne le gamestate
+		return partie.getGamestate();
 	}
 }

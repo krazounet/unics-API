@@ -30,6 +30,13 @@ public class JoueurPartie {
 		return false;
 	}
 	
+	public CardSnapshot getCardFromHandByUuid(UUID uuid) {
+	    return main.stream()
+	            .filter(card -> card.snapshotId.equals(uuid))
+	            .findFirst()
+	            .orElse(null);
+	}
+	
 	public void piocheXcartes(int nb_a_piocher) {
 		if (nb_a_piocher <= 0 || deck.isEmpty()) {
 	        return;
