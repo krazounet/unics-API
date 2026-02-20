@@ -4,6 +4,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
+import unics.Enum.CardType;
 import unics.Enum.Keyword;
 import unics.snapshot.CardSnapshot;
 
@@ -16,6 +17,7 @@ public class CardInPlay {
 	    public UUID snapshotId;      // référence card_snapshot
 	    public int attack;			
 	    public int health;
+	    public CardType cardType;
 	    public Inclinaison exhausted;
 
 	    public Map<String, Integer>  effects; // STRING du gere, dégat, debuff, etc... Integer : intensité
@@ -24,7 +26,7 @@ public class CardInPlay {
 	    public CardInPlay(CardSnapshot snap) {
 			this.instanceId = UUID.randomUUID(); //je sais pas
 			this.snapshotId = snap.snapshotId;
-			
+			this.cardType   = snap.type;
 			this.attack 	= snap.attack;
 			this.health		= snap.health;
 			this.exhausted  = getInclinaison(snap);

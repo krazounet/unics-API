@@ -3,6 +3,7 @@ package unics.game;
 public enum PhasePartie {
 	TURN_START,
 	DRAW,
+	FADE,
 	ENERGY_REFRESH,
 	PLAY_CARDS,
 	ATTACK_LEFT,

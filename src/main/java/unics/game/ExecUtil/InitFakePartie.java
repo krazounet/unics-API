@@ -91,6 +91,7 @@ public class InitFakePartie {
             //gameState.rngSeed = rngSeed;
 
             Partie partie = new Partie();
+            partie.setGamestate(gameState);
             partie.setId_partie(partie_id);
             gameState.partie = partie_id;
             
@@ -99,7 +100,7 @@ public class InitFakePartie {
             partie.setJoueur_actif(j1.getId_joueur()); 
             partie.setTour(0);
             partie.setStep(0); 
-            partie.setGamestate(gameState); 
+             
 
             partieDao.insert(partie);
 
@@ -164,11 +165,8 @@ public class InitFakePartie {
         return jp;
     }
     private static CardInPlay toCardInPlay(CardSnapshot snapshot, CardInPlay.Inclinaison inclinaison) {
-        CardInPlay cip = new CardInPlay();
-        cip.instanceId = UUID.randomUUID();
-        cip.snapshotId = snapshot.snapshotId;
-        cip.attack = snapshot.attack;
-        cip.health = snapshot.health;
+        CardInPlay cip = new CardInPlay(snapshot);
+        
         cip.exhausted = inclinaison;
         cip.effects = new HashMap<>();
         return cip;

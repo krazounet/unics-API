@@ -67,6 +67,7 @@ public class GameController {
 
         return ResponseEntity.ok(updatedGame);
     }
+    
     @PostMapping("/{gameId}/end-play")
     public ResponseEntity<GameState> endPlay(
             @PathVariable String gameId,
@@ -78,6 +79,20 @@ public class GameController {
                 request.getPlayerId()
             )
         );
+    }
+        @PostMapping("/{gameId}/atk-pass")
+        public ResponseEntity<GameState> atkpass(
+                @PathVariable String gameId,
+                @RequestBody AtkPassRequest request
+        ) {
+            return ResponseEntity.ok(
+                gameService.handleAtkPassPhase(
+                    gameId,
+                    request.getPlayerId(),
+                    request.getPosition()
+                )
+            );
+          
     }
 }
 

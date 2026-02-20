@@ -131,6 +131,11 @@ public class Partie {
 		step++;
 		gamestate.step++;
 	}
+	public void increaseTour() {
+		tour++;
+		gamestate.tour++;
+		
+	}
 	
 	
 }

@@ -88,6 +88,13 @@ public class JdbcPartieDao {
             }
 
             Partie partie = new Partie();
+            
+            String payload = rs.getString("payload");
+            GameState gs = MAPPER.readValue(payload, GameState.class);
+            partie.setJ1(gs.J1);
+            partie.setJ2(gs.J2);
+            partie.setGamestate(gs); 
+            
             partie.setId_partie((UUID) rs.getObject("id"));
             partie.setEtat_partie(EtatPartie.valueOf(rs.getString("etat"))); 
             partie.setPhase_partie(PhasePartie.valueOf(rs.getString("phase")));
@@ -95,11 +102,7 @@ public class JdbcPartieDao {
             partie.setTour(rs.getInt("tour")); 
             partie.setStep(rs.getInt("step")); 
 
-            String payload = rs.getString("payload");
-            GameState gs = MAPPER.readValue(payload, GameState.class);
-            partie.setJ1(gs.J1);
-            partie.setJ2(gs.J2);
-            partie.setGamestate(gs); 
+            
 
             return Optional.of(partie);
 
@@ -113,7 +116,8 @@ public class JdbcPartieDao {
     // ─────────────────────────────────────────────
 
     public void update(Partie partie) {
-
+    	
+    	
         String sql = """
             UPDATE partie
             SET
@@ -138,7 +142,7 @@ public class JdbcPartieDao {
             ps.setObject(7, partie.getId_partie());
 
             ps.executeUpdate();
-
+            //System.out.println("Rows updated = " + rows);
         } catch (Exception e) {
             throw new RuntimeException("Failed to update Partie " + partie.getId_partie(), e);
         }
