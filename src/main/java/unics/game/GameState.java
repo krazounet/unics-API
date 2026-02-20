@@ -31,4 +31,11 @@ public class GameState {
 	    }
 	    return effects_to_resolve.get(0);
 	}
+	@JsonIgnore
+	public EffectToResolve popCurrentEffect() {
+	    if (effects_to_resolve == null || effects_to_resolve.isEmpty()) {
+	        return null;
+	    }
+	    return effects_to_resolve.remove(0);
+	}
 }

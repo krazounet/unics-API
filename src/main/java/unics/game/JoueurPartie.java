@@ -16,7 +16,7 @@ public class JoueurPartie {
 	private List<CardSnapshot> deck;
 	private List<CardSnapshot> defausse;
 	private Map<Slot, CardInPlay> plateau;
-	private Map<String, Integer> compteurs;
+	private Map<String, Integer> compteurs;//ENERGY
 	
 	
 	public boolean hasCardInHand(String uuid_card) {
@@ -183,6 +183,8 @@ public class JoueurPartie {
 	    RIGHT
 	}
 
+	
+	
 	public void retireMana(int nb) {
 		mana_dispo=mana_dispo-nb;
 	}

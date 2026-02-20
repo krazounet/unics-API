@@ -7,6 +7,7 @@ import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RestController;
 
 import unics.api.cards.dto.CardDto;
+import unics.api.game.service.CardSnapshotService;
 import unics.snapshot.CardSnapshot;
 
 @RestController

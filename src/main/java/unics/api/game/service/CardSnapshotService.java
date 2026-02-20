@@ -1,4 +1,4 @@
-package unics.api.cards;
+package unics.api.game.service;
 
 import java.util.Map;
 import java.util.UUID;

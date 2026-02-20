@@ -1,4 +1,4 @@
-package unics.api.game;
+package unics.api.game.service;
 
 
 
@@ -7,18 +7,18 @@ import java.util.Collections;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
-import java.util.stream.Collectors;
 
 import org.springframework.stereotype.Service;
 
+import unics.Enum.AbilityType;
 import unics.Enum.CardType;
+import unics.Enum.EffectConstraint;
 import unics.Enum.TriggerType;
-import unics.api.cards.CardSnapshotService;
+import unics.api.game.EffectToResolve;
+import unics.api.game.GameActionException;
 import unics.game.CardInPlay;
-import unics.game.CardInPlay.Inclinaison;
 import unics.game.EtatPartie;
 import unics.game.GameState;
 import unics.game.JoueurPartie;
@@ -33,13 +33,28 @@ import unics.snapshot.EffectSnapshot;
 @Service
 public class GameService {
 
-	private final CardSnapshotService cardSnapshotService;
+//	private final CardSnapshotService cardSnapshotService;
 	private final JdbcPartieDao partieDao;
-
+	
+	private final PlateauService plateauService;
+	private final TriggerService triggerService;
+	private final AbilityService abilityService;
+	private final ContrainteService contrainteService;
+	
 	public GameService(CardSnapshotService cardSnapshotService,
-            JdbcPartieDao partieDao) {
-		this.cardSnapshotService = cardSnapshotService;
+            JdbcPartieDao partieDao,
+            TriggerService triggerService,
+            PlateauService plateauService,
+            ContrainteService contrainteService,
+            AbilityService abilityService
+			) {
+
+//		this.cardSnapshotService = cardSnapshotService;
 		this.partieDao = partieDao;
+		this.triggerService = triggerService;
+		this.plateauService = plateauService;
+		this.contrainteService = contrainteService;
+		this.abilityService =abilityService;
 	}
 	
 	private Partie loadPartie(UUID partieID) {
@@ -73,7 +88,7 @@ public class GameService {
 	    }
 		
 		//4 Vérifier que les cartes sont dans la main
-		JoueurPartie joueur = getJoueur(partie, uuid_joueur_actif);
+		JoueurPartie joueur = getJoueurActif(partie, uuid_joueur_actif);
 		
 			
 		
@@ -98,10 +113,6 @@ public class GameService {
 		        iterator.remove();        // on supprime proprement
 		    }
 		}
-		
-		
-		//joueur.getMain().removeIf(c -> cards.contains(c.snapshotId.toString()));
-		
 		//6 on tire N nouvelle cartes avant de rajouter les cartes dans le deck et remélanger
 		joueur.piocheXcartes(cards.size());
 		
@@ -126,8 +137,8 @@ public class GameService {
 	}
 
 	public GameState handlePlayCard(String gameId, String playerId, String card_uuid, String position) {
+		System.out.println("GameService.handlePlayCard : "+playerId+" / "+card_uuid+"/"+position);
 		//1 recupérer la game ou le GameState
-		
 		Partie partie = loadPartie(UUID.fromString(gameId));
 				
 		//2 verif que l'envoyeur est bien le joueur actif
@@ -141,17 +152,10 @@ public class GameService {
 			throw new GameActionException("Not in play phase : "+partie.getPhase_partie());
 	    }
 		//4 Vérifier que les cartes sont dans la main
-		JoueurPartie joueur = null;
-		JoueurPartie opposant = null;
-		if (uuid_joueur_actif.equals(partie.getJ1().getOwner().getId_joueur())) {
-		//System.out.println("J1");
-			joueur 	= partie.getJ1();
-			opposant= partie.getJ2();
-		}else {
-		//System.out.println("J2");
-			joueur = partie.getJ2();
-			opposant= partie.getJ1();
-		}
+		JoueurPartie joueur = getJoueurActif(partie, uuid_joueur_actif);
+		JoueurPartie opposant = getOpposant(partie, joueur);
+		
+		
 		CardSnapshot snap = joueur.getCardFromHandByUuid(UUID.fromString(card_uuid));
 		if (snap==null) {
 		    throw new GameActionException("Card not in hand : "+card_uuid+" main : "+joueur.getMain());
@@ -169,33 +173,22 @@ public class GameService {
 		//7 verif type != action
 		if (snap.type == CardType.ACTION) throw new GameActionException("CARTE ACTION NOT IN SLOT");
 		
-		//8 retrait main
-		joueur.getMain().remove(snap);
-		
-		//9 ajout plateau
-		//=> je dois creer une cardInPlay qui correspond au snap
-		joueur.getPlateau().put(slot, new CardInPlay(snap));
-		
-		//10retrait mana
-		joueur.retireMana(snap.cost); 
+		plateauService.playCard(partie,joueur,opposant,snap,slot);
 		
 		//12 log event
 		LogEvent log = new LogEvent(joueur.getOwner().getPseudo()+" a joué "+snap.name+" à "+position,"en",joueur.getOwner().getId_joueur().toString(),"",snap.snapshotId.toString(),null);
 		partie.getGamestate().log.add(log);
 		
 		//10 check trigger
-		checkTrigger(new ArrayList<TriggerType>(List.of(
+		triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(
 												TriggerType.ON_ENTER, 
 												TriggerType.ON_PLAY, 
 												TriggerType.ON_ALLIED_UNIT_ENTERS												
-											)),
-					partie,
-					joueur,opposant,
-					snap);
+											)),	partie,	joueur,opposant,snap);
 		
 		//11 Passer à la phase suivante // si aucune carte dispo, ni slot
-		if (partie.getGamestate().getCurrentEffect() != null) {
-			
+		if (!partie.getGamestate().effects_to_resolve.isEmpty()) {
+			System.out.println("GameService.handlePlayCard Effet à résoudre à la pause");
 			handleResolveEffect(partie,joueur,opposant);
 		}
 		
@@ -258,7 +251,7 @@ public class GameService {
 		}
 		
 		//4 devait il attaquer. est ce que son slot gauche contenait une unité
-		JoueurPartie joueur = getJoueur(partie, uuid_joueur_actif);
+		JoueurPartie joueur = getJoueurActif(partie, uuid_joueur_actif);
 		
 		
 		CardInPlay cip = joueur.getPlateau().get(slot);
@@ -291,142 +284,170 @@ public class GameService {
 	 * @param joueur 
 	 */
 	private void handleEndOfTurn(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
-		//1 check trigger
-		checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.ON_TURN_END)),
-							partie,
-							joueur,opposant,
-							null);
-		//test si trigger a résoudre ou pas.
-		if (partie.getGamestate().effects_to_resolve.isEmpty()) {
-			//passage au tour suivant
-			handleStartOfTurn(partie,joueur,opposant);
-		}
-		else {
-			//direction résolution
-			handleResolveEffect(partie,joueur,opposant);
-		}
+		partie.increaseStep();
+		partie.setPhase_partie(PhasePartie.TURN_END);
+		partie.setEtat_partie(EtatPartie.RUNNING);
+
+		triggerService.checkTrigger(List.of(TriggerType.ON_TURN_END), partie, joueur, opposant, null);
+
+		continueFlow(partie, joueur, opposant);
 	}
 
 
 
 	private void handleStartOfTurn(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
 		partie.increaseStep();
+		partie.setPhase_partie(PhasePartie.TURN_START);
+		partie.setEtat_partie(EtatPartie.RUNNING);
 		
+		/*
 		//inversion des joueurs
 		JoueurPartie tmp = joueur;
 		joueur=opposant;
 		opposant=tmp;
 		partie.setJoueur_actif(joueur.getOwner().getId_joueur());
-		partie.setPhase_partie(PhasePartie.TURN_START);
-		// Est un nouveau TOUR ?
-		// Si joueur est J1, on est donc revenu au premier joueur => nouveau TOUR
+		*/
+		// ✅ Nouveau tour si retour à J1
 		if (partie.getJ1()==joueur)partie.increaseTour();
 		
-		LogEvent log = new LogEvent("Nouveau tour : "+partie.getTour(),"New Turn",null,null,null,null);
+		LogEvent log = new LogEvent("Nouveau tour : "+joueur.getOwner().getPseudo()+" de jouer !","New Turn",joueur.getOwner().getId_joueur().toString(),null,null,null);
 		partie.getGamestate().log.add(log);
 		
-		checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.ON_TURN_START)), partie, joueur, opposant, null);
+		triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.ON_TURN_START)), partie, joueur, opposant, null);
 		
 		//test si trigger a résoudre ou pas.
-		if (partie.getGamestate().effects_to_resolve.isEmpty()) {
-			handleFade(partie,joueur,opposant);
-		}
-		
-			else {
-				handleResolveEffect(partie,joueur,opposant);
-		}
+		//continueFlow(partie, joueur, opposant);
 		
 	}
 	
-	private void handleFade(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
+	private void handleEnergieRefresh(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
 		partie.increaseStep();
-		partie.setPhase_partie(PhasePartie.FADE);
-		//on fade d'abord les cartes qui vont mourrir
-		for (Map.Entry<Slot, CardInPlay> entry : joueur.getPlateau().entrySet()) {
-		    CardInPlay cip = entry.getValue();
-		    if (cip == null) continue;
-		    if (cip.exhausted != Inclinaison.COUCHE) continue;
-		    CardSnapshot snapshot = cardSnapshotService.getById(cip.snapshotId);
-		    joueur.getDefausse().add(snapshot);
-		    entry.setValue(null); // on vide le slot sans le supprimer
-		    checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.ON_LEAVE)), partie, joueur, opposant, snapshot);
+		partie.setPhase_partie(PhasePartie.ENERGY_REFRESH);
+		partie.setEtat_partie(EtatPartie.RUNNING);
+		
+		//pending mana
+		int energy = joueur.getCompteurs().getOrDefault("ENERGY", 0);
+		int mana_dispo = partie.getTour()+energy;
+		if (mana_dispo <0) mana_dispo =0;
+		joueur.setMana_dispo(mana_dispo);
+		if (energy!=0) {
+			LogEvent log = new LogEvent("Application Bonus/Malus énergie : "+energy,"",joueur.getOwner().getId_joueur().toString(),null,null,null);
+			partie.getGamestate().log.add(log);
 		}
-		//check si trigger a résoudre
+			
+		
+		joueur.getCompteurs().put("ENERGY", 0);
+		//###JE NE CONNAIS PAS DE TRIGGER AU MANA
+		
+		
 		
 	}
 
-	private void handleResolveEffect(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
-		partie.setEtat_partie(EtatPartie.RESOLVE_EFFECT);
+	private void handleActivation(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
+		partie.increaseStep();
+		partie.setPhase_partie(PhasePartie.ACTIVATION);
+		partie.setEtat_partie(EtatPartie.RUNNING);
+		
 	}
-	/***
-	 * test pour chaque trigger, qui quoi, pourqoi
-	 * @param triggers
-	 * @param partie
-	 * @param joueur
-	 * @param snap CarteJouée
-	 */
-	private void checkTrigger(ArrayList<TriggerType> triggers, Partie partie, JoueurPartie joueur,JoueurPartie opposant ,CardSnapshot carte_jouee) {
-		for(TriggerType trigger : triggers) {
-			switch (trigger) {
-			case TriggerType.ON_PLAY :
-			case TriggerType.ON_ENTER :
-				//seule la carte jouée est testée
-				resolveEffectsForSnapshot(carte_jouee, trigger, joueur, partie);
-				break;
-			case TriggerType.ON_ALLIED_UNIT_ENTERS :
-				//On teste les autres cartes du plateau joueur
-				for(CardInPlay cip : joueur.getPlateau().values()) {
-					//cip peut être null car une case de plateau vide contient cip null
-					if (cip == null) continue;
-					//j'exlue la carte qui a été jouée des tess
-					if (!cip.snapshotId.equals(carte_jouee.snapshotId)) continue;
-						//donc ici j'ai potentiellement 2 cartes
-						CardSnapshot snapshot = cardSnapshotService.getById(cip.snapshotId);
-						resolveEffectsForSnapshot(snapshot, trigger, joueur, partie);
+
+	private void handleDraw(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
+		partie.increaseStep();
+		partie.setPhase_partie(PhasePartie.DRAW);
+		partie.setEtat_partie(EtatPartie.RUNNING);
+		//verfi deck pas vide
+		if (joueur.getDeck().size()==0) {
+			LogEvent log = new LogEvent("Deck vide","Empty Deck",joueur.getOwner().getId_joueur().toString(),null,null,null);
+			partie.getGamestate().log.add(log);
+		}
+		else {
+			//verif nb carte en main
+			
+			int nb_cartes_main = joueur.getMain().size();
+			int capacite_pioche= 7- nb_cartes_main; //MAGIC NUMBER
+			if (capacite_pioche > 0)joueur.piocheXcartes(1);
+			LogEvent log = new LogEvent(joueur.getOwner().getPseudo()+"pioche une carte","Draw 1",joueur.getOwner().getId_joueur().toString(),null,null,null);
+			partie.getGamestate().log.add(log);
+		}
+	}
+	
+	
+	private void handleResolveEffect(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
+		partie.increaseStep();
+		partie.setEtat_partie(EtatPartie.RESOLVE_EFFECT);
+		
+		boolean is_interactiv = false;
+		
+		while (!is_interactiv && partie.getGamestate().getCurrentEffect() != null) {
+			System.out.println("handleResolveEffect : "+partie.getGamestate().getCurrentEffect().getEffet_source().ability);
+			EffectToResolve current = partie.getGamestate().getCurrentEffect();
+			EffectSnapshot es = current.getEffet_source();
+
+			boolean is_constraint_respected = true;
+			//si des contraintes sont pas respectable : on vide l'effet.
+			Set<EffectConstraint> ec = es.constraints;
+			if (ec.size() == 0) is_constraint_respected = true;
+			else {
+				for (EffectConstraint constraint : ec) {
+				    // traitement
+				    boolean respected = contrainteService.is_Constraint_respected(partie,joueur,opposant,constraint,current);
+				    if (!respected) {is_constraint_respected = false;break;}
 				}
-				break;
-			case TriggerType.ON_TURN_END :
-			case TriggerType.ON_TURN_START :
-				resolveForBoard(joueur, trigger, partie);
-				break;
-			default:
-				throw new GameActionException("TRIGGER NON GERE");
 			}
 			
 			
+			AbilityType at = es.ability;
+			boolean required_target = at.requiresTarget();
+			System.out.println("handleResolveEffect is_constraint_respected: "+is_constraint_respected + "    required_target :"+required_target);
+			//3 cas possible. 
+			//1 => contrainte impossible => on supprime
+			//2 => contrinate possible ou pas de contrainte ET ne nécessite pas de cible => on résoud
+			//3=> contrainte possible ou pas de contrainte ET nécessite une cible => on action à demander.
+			
+			// =============================
+	        //  CAS 1 : Contrainte impossible
+	        // =============================
+
+	        if (!is_constraint_respected) {
+
+	            // On supprime l'effet courant
+	            partie.getGamestate().popCurrentEffect();
+
+	            continue; // on passe au suivant
+	        }
+	        // =============================
+	        //  CAS 2 : Pas de cible requise
+	        // =============================
+
+	        if (!required_target) {
+	        	System.out.println("handleResolveEffect resolve ability");
+	            abilityService.resolveAbility(partie, joueur, opposant, current);
+
+	            // On retire l’effet de la pile
+	            partie.getGamestate().popCurrentEffect();
+
+	            continue;
+	        }
+	        // =============================
+	        //  CAS 3 : Cible requise
+	        // =============================
+
+	        if (required_target) {
+	            // On arrête la boucle → attente input joueur
+	            is_interactiv = true;
+	        }
+	        
+			
+		}
+		if (partie.getGamestate().getCurrentEffect() == null) {
+			partie.setEtat_partie(EtatPartie.RUNNING);
 		}
 		
 	}
 	
-	//une carte pouvant avoir plusieurs effets, parcours les effets de la carte
-	private void resolveEffectsForSnapshot(CardSnapshot snapshot,TriggerType trigger,JoueurPartie joueur,Partie partie) {
-			for (EffectSnapshot effect : getEffectsByTrigger(snapshot, trigger)) {
-				partie.getGamestate().effects_to_resolve.add(new EffectToResolve(effect,snapshot.snapshotId,joueur.getOwner().getId_joueur()));
-			}
-	}
-	//parcour le plateau
-	private void resolveForBoard(JoueurPartie joueur,TriggerType trigger,Partie partie) {
-		for (CardInPlay cip : joueur.getPlateau().values()) {
-			if (cip == null) continue;
-			CardSnapshot snapshot = cardSnapshotService.getById(cip.snapshotId);
-			resolveEffectsForSnapshot(snapshot, trigger, joueur, partie);
-		}
-	}
-	/**
-	 * renvoie les effect Snapshot d'un CardSnapshot qui match avec le Trigger
-	 * @param cardSnapshot
-	 * @param triggerType
-	 * @return
-	 */
-	private List<EffectSnapshot> getEffectsByTrigger(CardSnapshot cardSnapshot, TriggerType triggerType) {
-	    if (cardSnapshot == null || cardSnapshot.effects == null) return Collections.emptyList();
-	    return cardSnapshot.effects
-	            .stream()
-	            .filter(effect -> effect.trigger == triggerType)
-	            .collect(Collectors.toList());
-	}
 	
-	private JoueurPartie getJoueur(Partie partie, UUID joueur_id) {
+	
+	
+	private JoueurPartie getJoueurActif(Partie partie, UUID joueur_id) {
 		if (joueur_id.equals(partie.getJ1().getOwner().getId_joueur()))	
 			return partie.getJ1();
 		return partie.getJ2();
@@ -444,5 +465,54 @@ public class GameService {
 			return partie.getJ2();
 		return partie.getJ1();
 	}
+	
+	private void continueFlow(Partie partie,JoueurPartie joueur,JoueurPartie opposant) {
+
+// 1️⃣ PRIORITÉ ABSOLUE : effets à résoudre
+		if (!partie.getGamestate().effects_to_resolve.isEmpty()) {
+			partie.setEtat_partie(EtatPartie.RESOLVE_EFFECT);
+			return;
+		}
+
+// 2️⃣ sinon on avance selon la phase
+		switch (partie.getPhase_partie()) {
+
+		case TURN_END:
+			JoueurPartie tmp = joueur;
+		    joueur = opposant;
+		    opposant = tmp;
+		    partie.setJoueur_actif(joueur.getOwner().getId_joueur());
+			handleStartOfTurn(partie, joueur, opposant);
+			continueFlow(partie, joueur, opposant);
+			break;
+
+		case TURN_START:
+			//partie.setPhase_partie(PhasePartie.FADE);
+			handleDraw(partie, joueur, opposant);
+			continueFlow(partie, joueur, opposant);
+			break;
+		case DRAW:
+			plateauService.handleFade(partie, joueur, opposant);
+			continueFlow(partie, joueur, opposant);
+			break;
+		case FADE:
+			//partie.setPhase_partie(PhasePartie.ENERGY_REFRESH);
+			handleEnergieRefresh(partie, joueur, opposant);
+			continueFlow(partie, joueur, opposant);
+			break;
+
+		case ENERGY_REFRESH:
+			handleActivation(partie, joueur, opposant);
+			continueFlow(partie, joueur, opposant);
+			break;
+		case ACTIVATION ://apres activation, stop la boucle puisque c'est attack_left
+			partie.setPhase_partie(PhasePartie.ATTACK_LEFT);
+			partie.setEtat_partie(EtatPartie.RUNNING);
+			break;
+		default:
+			break;
+		}
+	}
+
 	
 }

@@ -136,6 +136,11 @@ public class Partie {
 		gamestate.tour++;
 		
 	}
+	public JoueurPartie getJoueurbyUUID(UUID owner_id) {
+		if (J1.getOwner().id_joueur.equals(owner_id))
+			return J1;
+		return J2;
+	}
 	
 	
 }

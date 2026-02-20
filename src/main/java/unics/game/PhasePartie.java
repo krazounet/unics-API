@@ -5,6 +5,7 @@ public enum PhasePartie {
 	DRAW,
 	FADE,
 	ENERGY_REFRESH,
+	ACTIVATION,
 	PLAY_CARDS,
 	ATTACK_LEFT,
 	ATTACK_CENTER,
