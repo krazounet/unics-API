@@ -31,7 +31,7 @@ public class AbilityService {
 			energy += current.getEffet_source().value;
 			joueur.getCompteurs().put("ENERGY", energy);
 			CardSnapshot snap = cardSnapshotService.getById(current.getCarte_source());
-			partie.getGamestate().log.add(new LogEvent(snap.name+" > Gain énergie : "+current.getEffet_source().value,"",null,null,snap.cardId.toString(),null));
+			partie.getGamestate().log.add(new LogEvent(snap.name+" > Gain énergie : "+current.getEffet_source().value,"",null,null,current.getCarte_source().toString(),null));
 			break;
 		default:
 			System.out.print("Ability non géré : ");

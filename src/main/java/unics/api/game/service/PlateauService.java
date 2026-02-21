@@ -10,6 +10,7 @@ import unics.Enum.TriggerType;
 import unics.game.CardInPlay;
 import unics.game.CardInPlay.Inclinaison;
 import unics.game.JoueurPartie;
+import unics.game.LogEvent;
 import unics.game.JoueurPartie.Slot;
 import unics.game.Partie;
 import unics.snapshot.CardSnapshot;
@@ -44,14 +45,10 @@ public class PlateauService {
 
             joueur.getDefausse().add(snapshot);
             entry.setValue(null); // on garde la structure
-
-            triggerService.checkTrigger(
-                    List.of(TriggerType.ON_LEAVE),
-                    partie,
-                    joueur,
-                    opposant,
-                    snapshot
-            );
+            System.out.println("LOG IS NULL ? " + (partie.getGamestate().log == null));
+            partie.getGamestate().log.add(new LogEvent(snapshot.name+" > quitte le plateau",snapshot.name+" > leave the board",null,null,snapshot.snapshotId.toString(),null));
+            triggerService.checkTrigger(List.of(TriggerType.ON_LEAVE),partie,joueur,opposant,snapshot);
+            
         }
 
         // 2️⃣ TRAVERS → COUCHE

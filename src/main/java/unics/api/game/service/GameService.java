@@ -344,6 +344,7 @@ public class GameService {
 	}
 
 	private void handleActivation(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
+		System.out.println("GameService.handleActivation");
 		partie.increaseStep();
 		partie.setPhase_partie(PhasePartie.ACTIVATION);
 		partie.setEtat_partie(EtatPartie.RUNNING);
@@ -496,7 +497,6 @@ public class GameService {
 			continueFlow(partie, joueur, opposant);
 			break;
 		case FADE:
-			//partie.setPhase_partie(PhasePartie.ENERGY_REFRESH);
 			handleEnergieRefresh(partie, joueur, opposant);
 			continueFlow(partie, joueur, opposant);
 			break;
@@ -506,7 +506,7 @@ public class GameService {
 			continueFlow(partie, joueur, opposant);
 			break;
 		case ACTIVATION ://apres activation, stop la boucle puisque c'est attack_left
-			partie.setPhase_partie(PhasePartie.ATTACK_LEFT);
+			partie.setPhase_partie(PhasePartie.ACTIVATION);
 			partie.setEtat_partie(EtatPartie.RUNNING);
 			break;
 		default:
