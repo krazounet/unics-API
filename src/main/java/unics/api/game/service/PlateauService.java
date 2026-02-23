@@ -36,9 +36,7 @@ public class PlateauService {
         this.triggerService = triggerService;
     }
 
-    public void handleFade(Partie partie,
-                           JoueurPartie joueur,
-                           JoueurPartie opposant) {
+    public void handleFade(Partie partie,JoueurPartie joueur,JoueurPartie opposant) {
 
         partie.increaseStep();
         partie.setPhase_partie(unics.game.PhasePartie.FADE);
@@ -51,13 +49,9 @@ public class PlateauService {
             if (cip.exhausted != Inclinaison.COUCHE) continue;
 
             CardSnapshot snapshot = cardSnapshotService.getById(cip.snapshotId);
-
-            joueur.getDefausse().add(snapshot);
-            entry.setValue(null); // on garde la structure
-            System.out.println("LOG IS NULL ? " + (partie.getGamestate().log == null));
-            partie.getGamestate().log.add(new LogEvent(snapshot.name+" > quitte le plateau",snapshot.name+" > leave the board",null,null,snapshot.snapshotId.toString(),null));
-            triggerService.checkTrigger(List.of(TriggerType.ON_LEAVE),partie,joueur,opposant,snapshot);
             
+            sendToGraveyard(partie,joueur,snapshot,entry.getKey(),TriggerType.ON_LEAVE);
+
         }
 
         // 2️⃣ TRAVERS → COUCHE
@@ -138,11 +132,12 @@ public class PlateauService {
 		int hp_final = Math.max(0, hp_initial-degat);
 		opposant.setHp(hp_final);
 		//LOG A METTRE
-		
-		triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.AFTER_ATTACK)), partie, opposant, opposant, snap);
+		////PAS SUR DU TOUT !!! ////
+		///
+		triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.AFTER_ATTACK)), partie, joueur, snap);
 	}
 	
-	public void handleCardInPlayAttackCard(Partie partie, JoueurPartie joueur, JoueurPartie opposant, CardInPlay cip,CardInPlay cip_adverse) {
+	public void handleCardInPlayAttackCard(Partie partie, JoueurPartie joueur, JoueurPartie opposant, CardInPlay cip,CardInPlay cip_adverse,Slot slot,Slot slot_adverse) {
 		CardSnapshot snap = cardSnapshotService.getById(cip.snapshotId);
 		CardSnapshot snap_adverse = cardSnapshotService.getById(cip_adverse.snapshotId);
 		
@@ -193,25 +188,52 @@ public class PlateauService {
 		cip.effects.put("BLESSURE", current_dmg);
 		
 		cip_adverse.health	-= degat_sur_cip_adv;
-		 current_dmg = cip_adverse.effects.getOrDefault("BLESSURE", 0);
+		current_dmg = cip_adverse.effects.getOrDefault("BLESSURE", 0);
 		current_dmg +=degat_sur_cip_adv;
 		cip_adverse.effects.put("BLESSURE", current_dmg);
 		
+		if (cip.health <=0) {
+			sendToGraveyard(partie,joueur,snap,slot,TriggerType.ON_DEATH);
+		}
+		if (cip_adverse.health <= 0) {
+			sendToGraveyard(partie,opposant,snap_adverse,slot_adverse,TriggerType.ON_DEATH);
+		}
 		
+		//trigger
+	
+		if (degat_sur_cip >0) {
+			triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.AFTER_DAMAGE)), partie, opposant, snap_adverse);
+			triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.AFTER_RECEIVE_DAMAGE)), partie, joueur,  snap);
+			}
+		if (degat_sur_cip_adv >0) { 
+			triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.AFTER_DAMAGE)), partie, joueur,snap);
+			triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.AFTER_RECEIVE_DAMAGE)), partie, opposant, snap_adverse);
+		}
 		
-		triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.AFTER_ATTACK)), partie, opposant, opposant, snap);
-		//trample
+		triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.AFTER_BEING_ATTACKED)), partie, opposant, snap_adverse);
+		triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.AFTER_ATTACK)), partie, joueur, snap);
+		//KW trample
 		if ((snap.keywords.contains(Keyword.TRAMPLE))&&(degat_sur_cip_adv>cip_adverse.health)) {
 			int degat_pc_adverse = Math.max(degat_sur_cip_adv-cip_adverse.health,0);
 			int hp_initial = opposant.getHp();
 			int hp_final = Math.max(0, hp_initial-degat_pc_adverse);
 			opposant.setHp(hp_final);
-			triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.PC_DAMAGED)), partie, null, opposant, null);
+			triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.PC_DAMAGED)), partie, opposant, snap);
 		}
 		
 		
 	}  
 	
+	private void sendToGraveyard(Partie partie, JoueurPartie joueur_concerne, CardSnapshot snap_concerne, Slot slot, TriggerType trigger) {
+		joueur_concerne.getDefausse().add(snap_concerne);
+        //entry.setValue(null); // on garde la structure
+        joueur_concerne.getPlateau().put(slot,null);
+        System.out.println("LOG IS NULL ? " + (partie.getGamestate().log == null));
+        partie.getGamestate().log.add(new LogEvent(snap_concerne.name+" > est mort",snap_concerne.name+" > is dead",null,null,snap_concerne.snapshotId.toString(),null));
+        triggerService.checkTrigger(List.of(trigger),partie,joueur_concerne,snap_concerne);
+		
+	}
+
 	/***
 	 * renvoie true si le joueur concerné a au moins une carte en jeu
 	 * @param joueur_concerne

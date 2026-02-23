@@ -34,8 +34,8 @@ public class InitFakePartie {
 
         
 
-        UUID joueur1Id = UUID.fromString("45ca93a9-4a52-4d1c-be38-87b5341e5788");
-        UUID joueur2Id = UUID.fromString("bdae434c-b2e4-48fb-9be6-b8b0124e5726");
+        UUID joueur1Id = UUID.fromString("2a62230f-27b3-4f9e-8d48-6c67e3528a38");
+        UUID joueur2Id = UUID.fromString("ce34cabf-b43b-49c0-a675-7a9aff0b8129");
 
         try (Connection connection = DbUtil.getConnection()) {
 

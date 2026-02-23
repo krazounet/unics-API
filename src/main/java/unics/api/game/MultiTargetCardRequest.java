@@ -2,7 +2,7 @@ package unics.api.game;
 
 import java.util.List;
 
-public class MulliganRequest {
+public class MultiTargetCardRequest {
     private List<String> cards;
     private String playerId;
     

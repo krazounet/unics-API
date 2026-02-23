@@ -42,7 +42,7 @@ public class GameController {
     @PostMapping("/{gameId}/mulligan")
     public ResponseEntity<GameState> mulligan(
             @PathVariable String gameId,
-            @RequestBody MulliganRequest request
+            @RequestBody MultiTargetCardRequest request
     ) {
 
         GameState updatedGame = gameService.handleMulligan(
@@ -110,5 +110,21 @@ public class GameController {
             );
 
     }
+        @PostMapping("/{gameId}/resolve_effect")
+        public ResponseEntity<GameState> resolveEffect(
+                @PathVariable String gameId,
+                @RequestBody MultiTargetCardRequest request
+        ) {
+            return ResponseEntity.ok(
+                gameService.handleResolveEffect(
+                    gameId,
+                    request.getPlayerId(),
+                    request.getCards()
+                 
+                )
+            );
+
+    }
+        
 }
 

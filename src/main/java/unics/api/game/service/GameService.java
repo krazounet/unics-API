@@ -12,9 +12,7 @@ import java.util.UUID;
 
 import org.springframework.stereotype.Service;
 
-import unics.Enum.AbilityType;
 import unics.Enum.CardType;
-import unics.Enum.EffectConstraint;
 import unics.Enum.TriggerType;
 import unics.api.game.EffectToResolve;
 import unics.api.game.GameActionException;
@@ -28,7 +26,6 @@ import unics.game.Partie;
 import unics.game.PhasePartie;
 import unics.game.db.JdbcPartieDao;
 import unics.snapshot.CardSnapshot;
-import unics.snapshot.EffectSnapshot;
 
 @Service
 public class GameService {
@@ -40,13 +37,15 @@ public class GameService {
 	private final TriggerService triggerService;
 	private final AbilityService abilityService;
 	private final ContrainteService contrainteService;
+	private final EffectService effectService;
 	
 	public GameService(CardSnapshotService cardSnapshotService,
             JdbcPartieDao partieDao,
             TriggerService triggerService,
             PlateauService plateauService,
             ContrainteService contrainteService,
-            AbilityService abilityService
+            AbilityService abilityService,
+            EffectService effectService
 			) {
 
 //		this.cardSnapshotService = cardSnapshotService;
@@ -55,6 +54,7 @@ public class GameService {
 		this.plateauService = plateauService;
 		this.contrainteService = contrainteService;
 		this.abilityService =abilityService;
+		this.effectService = effectService;
 	}
 	
 	private Partie loadPartie(UUID partieID) {
@@ -180,12 +180,12 @@ public class GameService {
 												TriggerType.ON_ENTER, 
 												TriggerType.ON_PLAY, 
 												TriggerType.ON_ALLIED_UNIT_ENTERS												
-											)),	partie,	joueur,opposant,snap);
+											)),	partie,	joueur,snap);
 		
 		//11 Passer à la phase suivante // si aucune carte dispo, ni slot
 		if (!partie.getGamestate().effects_to_resolve.isEmpty()) {
 			System.out.println("GameService.handlePlayCard Effet à résoudre à la pause");
-			handleResolveEffect(partie,joueur,opposant);
+			effectService.resolveEffect(partie,joueur,opposant);
 		}
 		partie.increaseStep();
 		
@@ -247,9 +247,10 @@ public class GameService {
 		
 		CardInPlay cip = joueur.getPlateau().get(slot);
 		
-		if (cip != null && cip.cardType == CardType.UNIT) {
+		////////////////!!!!!!!!!!!!! FRAPPE IMMEDIATE NON GERREE !!!!!!!!--------
+		if (cip != null && cip.cardType == CardType.UNIT && cip.tour_invocation > partie.getTour()) {
 			//aut il un test supplémentaire ? y'a til des cas ou on a une unit et on ne peut pas attaquer ?
-			throw new GameActionException("Player must Attack with "+cip.snapshotId+" / "+position);
+			throw new GameActionException("Player must Attack with "+cip.snapshotId+" / "+position+" / "+cip.tour_invocation);
 		}
 
 		
@@ -265,7 +266,7 @@ public class GameService {
 		partie.setEtat_partie(EtatPartie.RUNNING);
 		
 		if (nextPhase  == PhasePartie.TURN_END)
-			handleEndOfTurn(partie, joueur,getOpposant(partie, joueur));
+			endOfTurnPhase(partie, joueur,getOpposant(partie, joueur));
 		
 		partieDao.update(partie);
 	    return partie.getGamestate();
@@ -307,31 +308,56 @@ public class GameService {
 			    return partie.getGamestate();
 			}
 			//comme PC_DAMAGED peut être autant sur soit joueur que sur opposant on ne donne a check que celui que ça concerne, donc ici : OPPOSANT
-			triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.PC_DAMAGED)), partie, null, opposant, null);
+			triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.PC_DAMAGED)), partie, opposant, null);
 		}
 		else {
 			Slot slot_adverse = Slot.valueOf(cible.toUpperCase());
 			CardInPlay cip_adverse = opposant.getPlateau().get(slot_adverse);
-			plateauService.handleCardInPlayAttackCard(partie,joueur,opposant, cip,cip_adverse);
-			
-			
-			//keyword.
+			plateauService.handleCardInPlayAttackCard(partie,joueur,opposant, cip,cip_adverse, slot, slot_adverse);
+
+		}
+		if (!partie.getGamestate().effects_to_resolve.isEmpty()) {
+			System.out.println("GameService.handleAtkAction Effet à résoudre à la pause");
+			effectService.resolveEffect(partie,joueur,opposant);
+		}
+		else {
+			PhasePartie nextPhase = switch (slot) {
+    			case LEFT -> PhasePartie.ATTACK_CENTER;
+    			case CENTER -> PhasePartie.ATTACK_RIGHT;
+    			case RIGHT -> PhasePartie.TURN_END; // ou END_PHASE selon ton design
+    			
+			};
+			partie.setPhase_partie(nextPhase);	
+			partie.setEtat_partie(EtatPartie.RUNNING);
 		}
 		
-		PhasePartie nextPhase = switch (slot) {
-    		case LEFT -> PhasePartie.ATTACK_CENTER;
-    		case CENTER -> PhasePartie.ATTACK_RIGHT;
-    		case RIGHT -> PhasePartie.TURN_END; // ou END_PHASE selon ton design
-		};
 		partie.increaseStep();
-		partie.setPhase_partie(nextPhase);	
-		partie.setEtat_partie(EtatPartie.RUNNING);
 		partieDao.update(partie);
 	    return partie.getGamestate();
 
 
 	}
 	
+	public GameState handleResolveEffect(String gameId, String playerId, List<String> cards) {
+		System.out.println("GameService.handleResolveEffect");
+		Partie partie = loadPartie(UUID.fromString(gameId));
+		UUID uuid_joueur_actif = UUID.fromString(playerId);
+		//check joueur actif ok
+		if (!uuid_joueur_actif.equals(partie.getJoueur_actif()))   throw new GameActionException("joueur actif != playerid");
+		if (partie.getEtat_partie() != EtatPartie.RESOLVE_EFFECT)  throw new GameActionException("Not in Resolve state");
+	    
+		EffectToResolve etr= partie.getGamestate().getCurrentEffect();
+		
+		JoueurPartie joueur=getJoueurActif(partie, uuid_joueur_actif);
+		
+		effectService.handleResolveEffect(partie,joueur,getOpposant(partie, joueur),etr,cards);
+		
+		//check à faire si poursuite ou pas.
+		
+		partie.increaseStep();
+		partieDao.update(partie);
+	    return partie.getGamestate();
+	}
 	
 
 
@@ -341,19 +367,19 @@ public class GameService {
 	 * @param opposant 
 	 * @param joueur 
 	 */
-	private void handleEndOfTurn(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
+	private void endOfTurnPhase(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
 		partie.increaseStep();
 		partie.setPhase_partie(PhasePartie.TURN_END);
 		partie.setEtat_partie(EtatPartie.RUNNING);
 
-		triggerService.checkTrigger(List.of(TriggerType.ON_TURN_END), partie, joueur, opposant, null);
+		triggerService.checkTrigger(List.of(TriggerType.ON_TURN_END), partie, joueur, null);
 
 		continueFlow(partie, joueur, opposant);
 	}
 
 
 
-	private void handleStartOfTurn(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
+	private void startOfTurnPhase(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
 		partie.increaseStep();
 		partie.setPhase_partie(PhasePartie.TURN_START);
 		partie.setEtat_partie(EtatPartie.RUNNING);
@@ -364,14 +390,14 @@ public class GameService {
 		LogEvent log = new LogEvent("Nouveau tour : "+joueur.getOwner().getPseudo()+" de jouer !","New Turn",joueur.getOwner().getId_joueur().toString(),null,null,null);
 		partie.getGamestate().log.add(log);
 		
-		triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.ON_TURN_START)), partie, joueur, opposant, null);
+		triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.ON_TURN_START)), partie, joueur, null);
 		
 		//test si trigger a résoudre ou pas.
 		//continueFlow(partie, joueur, opposant);
 		
 	}
 	
-	private void handleEnergieRefresh(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
+	private void energieRefreshPhase(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
 		partie.increaseStep();
 		partie.setPhase_partie(PhasePartie.ENERGY_REFRESH);
 		partie.setEtat_partie(EtatPartie.RUNNING);
@@ -392,17 +418,17 @@ public class GameService {
 		
 	}
 
-	private void handleActivation(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
+	private void activationPhase(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
 		System.out.println("GameService.handleActivation");
 		partie.increaseStep();
 		partie.setPhase_partie(PhasePartie.ACTIVATION);
 		partie.setEtat_partie(EtatPartie.RUNNING);
-		triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.ON_TURN_START)), partie, joueur, opposant, null);
+		triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.ON_ACTIVATION)), partie, joueur, null);
 		plateauService.handleMOBILEkeyword(partie,joueur,opposant);
 		
 	}
 
-	private void handleDraw(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
+	private void drawPhase(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
 		partie.increaseStep();
 		partie.setPhase_partie(PhasePartie.DRAW);
 		partie.setEtat_partie(EtatPartie.RUNNING);
@@ -423,72 +449,6 @@ public class GameService {
 	}
 	
 	
-	private void handleResolveEffect(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
-		partie.increaseStep();
-		partie.setEtat_partie(EtatPartie.RESOLVE_EFFECT);
-		
-		boolean is_interactiv = false;
-		
-		while (!is_interactiv && partie.getGamestate().getCurrentEffect() != null) {
-			System.out.println("handleResolveEffect : "+partie.getGamestate().getCurrentEffect().getEffet_source().ability);
-			EffectToResolve current = partie.getGamestate().getCurrentEffect();
-			EffectSnapshot es = current.getEffet_source();
-
-			boolean is_constraint_respected = true;
-			//si des contraintes sont pas respectable : on vide l'effet.
-			Set<EffectConstraint> ec = es.constraints;
-			if (ec.size() == 0) is_constraint_respected = true;
-			else {
-				for (EffectConstraint constraint : ec) {
-				    // traitement
-				    boolean respected = contrainteService.is_Constraint_respected(partie,joueur,opposant,constraint,current);
-				    if (!respected) {is_constraint_respected = false;break;}
-				}
-			}
-			
-			
-			AbilityType at = es.ability;
-			boolean required_target = at.requiresTarget();
-			System.out.println("handleResolveEffect is_constraint_respected: "+is_constraint_respected + "    required_target :"+required_target);
-			//3 cas possible. 
-			// =============================
-	        //  CAS 1 : Contrainte impossible
-	        // =============================
-
-	        if (!is_constraint_respected) {
-
-	            // On supprime l'effet courant
-	            partie.getGamestate().popCurrentEffect();
-
-	            continue; // on passe au suivant
-	        }
-	        // =============================
-	        //  CAS 2 : Pas de cible requise
-	        // =============================
-
-	        if (!required_target) {
-	        	System.out.println("handleResolveEffect resolve ability");
-	            abilityService.resolveAbility(partie, joueur, opposant, current);
-	            // On retire l’effet de la pile
-	            partie.getGamestate().popCurrentEffect();
-	            continue;
-	        }
-	        // =============================
-	        //  CAS 3 : Cible requise
-	        // =============================
-
-	        if (required_target) {
-	            // On arrête la boucle → attente input joueur
-	            is_interactiv = true;
-	        }
-	        
-			
-		}
-		if (partie.getGamestate().getCurrentEffect() == null) {
-			partie.setEtat_partie(EtatPartie.RUNNING);
-		}
-		
-	}
 	
 	
 	
@@ -528,13 +488,13 @@ public class GameService {
 		    joueur = opposant;
 		    opposant = tmp;
 		    partie.setJoueur_actif(joueur.getOwner().getId_joueur());
-			handleStartOfTurn(partie, joueur, opposant);
+			startOfTurnPhase(partie, joueur, opposant);
 			continueFlow(partie, joueur, opposant);
 			break;
 
 		case TURN_START:
 			//partie.setPhase_partie(PhasePartie.FADE);
-			handleDraw(partie, joueur, opposant);
+			drawPhase(partie, joueur, opposant);
 			continueFlow(partie, joueur, opposant);
 			break;
 		case DRAW:
@@ -542,12 +502,12 @@ public class GameService {
 			continueFlow(partie, joueur, opposant);
 			break;
 		case FADE:
-			handleEnergieRefresh(partie, joueur, opposant);
+			energieRefreshPhase(partie, joueur, opposant);
 			continueFlow(partie, joueur, opposant);
 			break;
 
 		case ENERGY_REFRESH:
-			handleActivation(partie, joueur, opposant);
+			activationPhase(partie, joueur, opposant);
 			continueFlow(partie, joueur, opposant);
 			break;
 		case ACTIVATION ://apres activation, stop la boucle puisque c'est PLAY_CARDS
@@ -572,6 +532,8 @@ public class GameService {
 		//calcul pass
 		
 	}
+
+	
 
 	
 }

@@ -27,9 +27,8 @@ public class TriggerService {
     public void checkTrigger(
             List<TriggerType> triggers,
             Partie partie,
-            JoueurPartie joueur,
-            JoueurPartie opposant,
-            CardSnapshot carteJouee
+            JoueurPartie joueur_concerne,
+            CardSnapshot carte_concernee
     ) {
 
         for (TriggerType trigger : triggers) {
@@ -39,31 +38,33 @@ public class TriggerService {
                 case ON_PLAY:
                 case ON_ENTER:
                 case ON_LEAVE:
-                    if (carteJouee != null) {
-                        resolveEffectsForSnapshot(carteJouee, trigger, joueur, partie);
+                case AFTER_DAMAGE:
+                case AFTER_RECEIVE_DAMAGE:
+                case AFTER_BEING_ATTACKED:
+                case AFTER_ATTACK:	
+                	//////////!!!!!!!! le trigger ne concerne pas forcément le joueur !!!!////
+                    if (carte_concernee != null) {
+                        resolveEffectsForSnapshot(carte_concernee, trigger, joueur_concerne, partie);
                     }
                     break;
 
                 case ON_ALLIED_UNIT_ENTERS:
-                    for (CardInPlay cip : joueur.getPlateau().values()) {
+                    for (CardInPlay cip : joueur_concerne.getPlateau().values()) {
                         if (cip == null) continue;
-                        if (!cip.snapshotId.equals(carteJouee.snapshotId)) continue;
+                        if (!cip.snapshotId.equals(carte_concernee.snapshotId)) continue;
 
                         CardSnapshot snapshot = cardSnapshotService.getById(cip.snapshotId);
-                        resolveEffectsForSnapshot(snapshot, trigger, joueur, partie);
+                        resolveEffectsForSnapshot(snapshot, trigger, joueur_concerne, partie);
                     }
                     break;
                 case PC_DAMAGED:
-                	//si joueur est à null => concerne opposant
-                	// si opposant est à null => concerne joueur
-                	JoueurPartie joueur_concerne = null;
-                	if (joueur == null)joueur_concerne=opposant;
-                	else joueur_concerne = joueur;
+
                 	resolveForBoard(joueur_concerne,trigger,partie);
                 	break;
                 case ON_TURN_START:
                 case ON_TURN_END:
-                    resolveForBoard(joueur, trigger, partie);
+                case ON_ACTIVATION:	
+                    resolveForBoard(joueur_concerne, trigger, partie);
                     break;
 
                 default:
@@ -83,6 +84,8 @@ public class TriggerService {
                             joueur.getOwner().getId_joueur()
                     )
             );
+            //LogEvent log = new LogEvent("Nouvel effet déclenché par "+snapshot.name,"en",joueur.getOwner().getId_joueur().toString(),"","",null);
+    		//partie.getGamestate().log.add(log);
         }
     }
 

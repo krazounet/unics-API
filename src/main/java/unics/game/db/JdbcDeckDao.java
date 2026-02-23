@@ -40,7 +40,7 @@ public class JdbcDeckDao implements DeckDao {
     @Override
     public void insert(Deck deck) {
         try {
-            connection.setAutoCommit(false);
+            
 
             try (PreparedStatement psDeck = connection.prepareStatement(
                     "INSERT INTO deck (id, owner_id, name) VALUES (?, ?, ?)"
@@ -64,7 +64,7 @@ public class JdbcDeckDao implements DeckDao {
                 psCard.executeBatch();
             }
 
-            connection.commit();
+            
 
         } catch (SQLException e) {
             rollbackQuietly();

@@ -4,6 +4,7 @@ package unics.game.ExecUtil;
 import java.sql.Connection;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.ThreadLocalRandom;
 
 import dbPG18.DbUtil;
 import dbPG18.JdbcCardSnapshotDao;
@@ -15,13 +16,13 @@ import unics.snapshot.CardSnapshot;
 
 public class InitFakeDecks {
 
-    private static final int DECK_SIZE = 30;
+    
 
     public static void main(String[] args) {
 
        
 
-        UUID joueurId = UUID.fromString("bdae434c-b2e4-48fb-9be6-b8b0124e5726");
+        UUID joueurId = UUID.fromString("ce34cabf-b43b-49c0-a675-7a9aff0b8129");
 
         try (Connection connection = DbUtil.getConnection()) {
 
@@ -35,11 +36,11 @@ public class InitFakeDecks {
                     .orElseThrow(() -> new IllegalStateException("Joueur introuvable"));
 
             // Cartes aléatoires
-            List<CardSnapshot> cards = snapshotDao.findRandom(DECK_SIZE);
+            RandomBooster booster = new RandomBooster(ThreadLocalRandom.current(), snapshotDao);
+            booster.generate();
+            List<CardSnapshot> cards = booster.cards;
 
-            if (cards.size() < DECK_SIZE) {
-                throw new IllegalStateException("Pas assez de CardSnapshot disponibles");
-            }
+
 
             // Créer deck
             Deck deck = new Deck(
