@@ -93,7 +93,22 @@ public class GameController {
                     request.getPosition()
                 )
             );
-          
+
+    }
+        @PostMapping("/{gameId}/atk-action")
+        public ResponseEntity<GameState> atkpass(
+                @PathVariable String gameId,
+                @RequestBody AtkActionRequest request
+        ) {
+            return ResponseEntity.ok(
+                gameService.handleAtkAction(
+                    gameId,
+                    request.getPlayerId(),
+                    request.getSource(),
+                    request.getCible()
+                )
+            );
+
     }
 }
 

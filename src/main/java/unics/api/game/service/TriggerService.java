@@ -8,6 +8,7 @@ import org.springframework.stereotype.Service;
 
 import unics.Enum.TriggerType;
 import unics.api.game.EffectToResolve;
+import unics.api.game.GameActionException;
 import unics.game.CardInPlay;
 import unics.game.JoueurPartie;
 import unics.game.Partie;
@@ -52,14 +53,21 @@ public class TriggerService {
                         resolveEffectsForSnapshot(snapshot, trigger, joueur, partie);
                     }
                     break;
-
+                case PC_DAMAGED:
+                	//si joueur est à null => concerne opposant
+                	// si opposant est à null => concerne joueur
+                	JoueurPartie joueur_concerne = null;
+                	if (joueur == null)joueur_concerne=opposant;
+                	else joueur_concerne = joueur;
+                	resolveForBoard(joueur_concerne,trigger,partie);
+                	break;
                 case ON_TURN_START:
                 case ON_TURN_END:
                     resolveForBoard(joueur, trigger, partie);
                     break;
 
                 default:
-                    throw new RuntimeException("Trigger non géré : " + trigger);
+                    throw new GameActionException("Trigger non géré : " + trigger);
             }
         }
     }

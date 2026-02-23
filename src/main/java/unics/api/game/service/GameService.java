@@ -63,7 +63,6 @@ public class GameService {
 	                new GameActionException("Partie introuvable : " + partieID)
 	            );
 	}
-	
     public GameState loadGameState(UUID partieId) {
 
     	return loadPartie(partieId).getGamestate();
@@ -89,9 +88,6 @@ public class GameService {
 		
 		//4 Vérifier que les cartes sont dans la main
 		JoueurPartie joueur = getJoueurActif(partie, uuid_joueur_actif);
-		
-			
-		
 		
 		for (String cardId : cards) {
 		    if (!joueur.hasCardInHand(cardId)) {
@@ -191,15 +187,10 @@ public class GameService {
 			System.out.println("GameService.handlePlayCard Effet à résoudre à la pause");
 			handleResolveEffect(partie,joueur,opposant);
 		}
-		
-		//12maj step
 		partie.increaseStep();
 		
-		//13 save game
 		partieDao.update(partie);
-		
-		
-		//20 on retourne le gamestate
+
 		return partie.getGamestate();
 	}
 	
@@ -256,7 +247,10 @@ public class GameService {
 		
 		CardInPlay cip = joueur.getPlateau().get(slot);
 		
-		if (cip != null && cip.cardType == CardType.UNIT)throw new GameActionException("Player must Attack with "+cip.snapshotId+" / "+position);
+		if (cip != null && cip.cardType == CardType.UNIT) {
+			//aut il un test supplémentaire ? y'a til des cas ou on a une unit et on ne peut pas attaquer ?
+			throw new GameActionException("Player must Attack with "+cip.snapshotId+" / "+position);
+		}
 
 		
 		PhasePartie nextPhase = switch (slot) {
@@ -277,6 +271,70 @@ public class GameService {
 	    return partie.getGamestate();
 	}
 	
+	public GameState handleAtkAction(String gameId, String playerId, String source, String cible) {
+		System.out.println("GameService.handleAtkAction");
+		Partie partie = loadPartie(UUID.fromString(gameId));
+		UUID uuid_joueur_actif = UUID.fromString(playerId);
+		//check joueur actif ok
+		if (!uuid_joueur_actif.equals(partie.getJoueur_actif())) {
+			throw new GameActionException("joueur actif != playerid");
+		}
+		//3 verifier phase / etat
+		Slot slot = Slot.valueOf(source.toUpperCase());
+		PhasePartie expectedPhase = switch (slot) {
+	    	case LEFT -> PhasePartie.ATTACK_LEFT;
+	    	case CENTER -> PhasePartie.ATTACK_CENTER;
+	    	case RIGHT -> PhasePartie.ATTACK_RIGHT;
+		};
+		if (partie.getPhase_partie() != expectedPhase) {
+			    throw new GameActionException("Phase mismatch : " + partie.getPhase_partie() + " / " + slot);
+		}
+		//4 devait il attaquer. est ce que son slot gauche contenait une unité
+		JoueurPartie joueur = getJoueurActif(partie, uuid_joueur_actif);
+		JoueurPartie opposant = getOpposant(partie, joueur);
+		CardInPlay cip = joueur.getPlateau().get(slot);
+		if (cip == null || cip.cardType != CardType.UNIT)throw new GameActionException("only unit attack "+cip.snapshotId+" / "+source);
+		
+		
+		
+		//2 cas possible cible == heros ou cible == slot.
+		if (cible.equals("HERO")) {
+			plateauService.handleCardInPlayAttackHero(partie,joueur,opposant, cip);
+			
+			if (opposant.getHp()==0) {
+				checkvictory(partie,opposant);
+				partieDao.update(partie);
+			    return partie.getGamestate();
+			}
+			//comme PC_DAMAGED peut être autant sur soit joueur que sur opposant on ne donne a check que celui que ça concerne, donc ici : OPPOSANT
+			triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.PC_DAMAGED)), partie, null, opposant, null);
+		}
+		else {
+			Slot slot_adverse = Slot.valueOf(cible.toUpperCase());
+			CardInPlay cip_adverse = opposant.getPlateau().get(slot_adverse);
+			plateauService.handleCardInPlayAttackCard(partie,joueur,opposant, cip,cip_adverse);
+			
+			
+			//keyword.
+		}
+		
+		PhasePartie nextPhase = switch (slot) {
+    		case LEFT -> PhasePartie.ATTACK_CENTER;
+    		case CENTER -> PhasePartie.ATTACK_RIGHT;
+    		case RIGHT -> PhasePartie.TURN_END; // ou END_PHASE selon ton design
+		};
+		partie.increaseStep();
+		partie.setPhase_partie(nextPhase);	
+		partie.setEtat_partie(EtatPartie.RUNNING);
+		partieDao.update(partie);
+	    return partie.getGamestate();
+
+
+	}
+	
+	
+
+
 	/**
 	 * Appelée apres l'attaque de droite OU pass de droite OU resolve effect en phase AttackRight
 	 * @param partie
@@ -299,14 +357,7 @@ public class GameService {
 		partie.increaseStep();
 		partie.setPhase_partie(PhasePartie.TURN_START);
 		partie.setEtat_partie(EtatPartie.RUNNING);
-		
-		/*
-		//inversion des joueurs
-		JoueurPartie tmp = joueur;
-		joueur=opposant;
-		opposant=tmp;
-		partie.setJoueur_actif(joueur.getOwner().getId_joueur());
-		*/
+
 		// ✅ Nouveau tour si retour à J1
 		if (partie.getJ1()==joueur)partie.increaseTour();
 		
@@ -339,8 +390,6 @@ public class GameService {
 		joueur.getCompteurs().put("ENERGY", 0);
 		//###JE NE CONNAIS PAS DE TRIGGER AU MANA
 		
-		
-		
 	}
 
 	private void handleActivation(Partie partie, JoueurPartie joueur, JoueurPartie opposant) {
@@ -348,6 +397,8 @@ public class GameService {
 		partie.increaseStep();
 		partie.setPhase_partie(PhasePartie.ACTIVATION);
 		partie.setEtat_partie(EtatPartie.RUNNING);
+		triggerService.checkTrigger(new ArrayList<TriggerType>(List.of(TriggerType.ON_TURN_START)), partie, joueur, opposant, null);
+		plateauService.handleMOBILEkeyword(partie,joueur,opposant);
 		
 	}
 
@@ -366,7 +417,7 @@ public class GameService {
 			int nb_cartes_main = joueur.getMain().size();
 			int capacite_pioche= 7- nb_cartes_main; //MAGIC NUMBER
 			if (capacite_pioche > 0)joueur.piocheXcartes(1);
-			LogEvent log = new LogEvent(joueur.getOwner().getPseudo()+"pioche une carte","Draw 1",joueur.getOwner().getId_joueur().toString(),null,null,null);
+			LogEvent log = new LogEvent(joueur.getOwner().getPseudo()+" pioche une carte","Draw 1",joueur.getOwner().getId_joueur().toString(),null,null,null);
 			partie.getGamestate().log.add(log);
 		}
 	}
@@ -400,10 +451,6 @@ public class GameService {
 			boolean required_target = at.requiresTarget();
 			System.out.println("handleResolveEffect is_constraint_respected: "+is_constraint_respected + "    required_target :"+required_target);
 			//3 cas possible. 
-			//1 => contrainte impossible => on supprime
-			//2 => contrinate possible ou pas de contrainte ET ne nécessite pas de cible => on résoud
-			//3=> contrainte possible ou pas de contrainte ET nécessite une cible => on action à demander.
-			
 			// =============================
 	        //  CAS 1 : Contrainte impossible
 	        // =============================
@@ -422,10 +469,8 @@ public class GameService {
 	        if (!required_target) {
 	        	System.out.println("handleResolveEffect resolve ability");
 	            abilityService.resolveAbility(partie, joueur, opposant, current);
-
 	            // On retire l’effet de la pile
 	            partie.getGamestate().popCurrentEffect();
-
 	            continue;
 	        }
 	        // =============================
@@ -505,13 +550,27 @@ public class GameService {
 			handleActivation(partie, joueur, opposant);
 			continueFlow(partie, joueur, opposant);
 			break;
-		case ACTIVATION ://apres activation, stop la boucle puisque c'est attack_left
-			partie.setPhase_partie(PhasePartie.ACTIVATION);
+		case ACTIVATION ://apres activation, stop la boucle puisque c'est PLAY_CARDS
+			partie.setPhase_partie(PhasePartie.PLAY_CARDS);
 			partie.setEtat_partie(EtatPartie.RUNNING);
 			break;
 		default:
 			break;
 		}
+	}
+
+	private void checkvictory(Partie partie, JoueurPartie joueur_mort) {
+		System.out.println("GameService.checkvictory");
+		if (joueur_mort.getHp()>0) throw new GameActionException("bizarre, il est pas mort..."); 
+		JoueurPartie joueur_victorieux = getOpposant(partie, joueur_mort);
+		LogEvent log = new LogEvent(joueur_victorieux.getOwner().getPseudo()+" gagne la partie",joueur_victorieux.getOwner().getPseudo()+" win the game",joueur_victorieux.getOwner().getId_joueur().toString(),null,null,null);
+		partie.getGamestate().log.add(log);
+		partie.increaseStep();
+		partie.setEtat_partie(EtatPartie.FINISHED);
+		//calcul ELO
+		//calcul xp
+		//calcul pass
+		
 	}
 
 	

@@ -15,11 +15,13 @@ public class CardInPlay {
 
 		public UUID instanceId;      // UNIQUE en partie
 	    public UUID snapshotId;      // référence card_snapshot
+	    
 	    public int attack;			
 	    public int health;
+	    
 	    public CardType cardType;
 	    public Inclinaison exhausted;
-
+	    public int tour_invocation =0;
 	    public Map<String, Integer>  effects; // STRING du gere, dégat, debuff, etc... Integer : intensité
 	
 	    
