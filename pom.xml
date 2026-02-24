@@ -43,8 +43,8 @@
         <!-- unics-core depuis GitHub -->
        <dependency>
     <groupId>com.github.krazounet</groupId>
-    <artifactId>Unics</artifactId>
-    <version>v1.0.17</version>
+    <artifactId>unics</artifactId>
+    <version>v1.0.20</version>
 
     <exclusions>
         <exclusion>
