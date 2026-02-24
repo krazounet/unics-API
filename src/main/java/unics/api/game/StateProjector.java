@@ -18,6 +18,7 @@ public class StateProjector {
         view.etat = state.etat_partie.name();
         view.phase = state.phase_partie.name();
         view.joueurActif = state.joueur_actif;
+        view.joueur_tour = state.joueur_tour;
         view.tour = state.tour;
         view.step = state.step;
         view.current_effect = state.getCurrentEffect();

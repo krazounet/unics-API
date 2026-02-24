@@ -303,5 +303,34 @@ public class PlateauService {
 	};
 		return immunity;
 	}
+	/**
+	 * renvoie le nombre de cartes sur le plateau d'un joueur
+	 * @param joueur
+	 * @return
+	 */
+	public int get_nb_cards_on_board(JoueurPartie joueur) {
+		int nb=0;
+		for (Map.Entry<Slot, CardInPlay> entry : joueur.getPlateau().entrySet()) {
+			CardInPlay cip = entry.getValue();
+            if (cip != null) nb++;
+		}
+		return nb;
+	}
+	/**
+	 * renvoie le nombre de carte d'un type sur le plateau d'un joueur
+	 * @param enemy
+	 * @param structure
+	 * @return
+	 */
+	public int get_nb_CardType_on_board(JoueurPartie joueur_concerne, CardType type) {
+		int nb=0;
+		for (Map.Entry<Slot, CardInPlay> entry : joueur_concerne.getPlateau().entrySet()) {
+			CardInPlay cip = entry.getValue();
+            if (cip != null) {
+            	if (cip.cardType == type)nb++;
+            }
+		}
+		return nb;
+	}
 	
 }

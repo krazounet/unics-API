@@ -14,7 +14,6 @@ import org.springframework.stereotype.Service;
 
 import unics.Enum.CardType;
 import unics.Enum.TriggerType;
-import unics.api.game.EffectToResolve;
 import unics.api.game.GameActionException;
 import unics.game.CardInPlay;
 import unics.game.EtatPartie;
@@ -87,7 +86,7 @@ public class GameService {
 	    }
 		
 		//4 Vérifier que les cartes sont dans la main
-		JoueurPartie joueur = getJoueurActif(partie, uuid_joueur_actif);
+		JoueurPartie joueur = partie.getJoueurActifbyUUID(uuid_joueur_actif);
 		
 		for (String cardId : cards) {
 		    if (!joueur.hasCardInHand(cardId)) {
@@ -148,8 +147,8 @@ public class GameService {
 			throw new GameActionException("Not in play phase : "+partie.getPhase_partie());
 	    }
 		//4 Vérifier que les cartes sont dans la main
-		JoueurPartie joueur = getJoueurActif(partie, uuid_joueur_actif);
-		JoueurPartie opposant = getOpposant(partie, joueur);
+		JoueurPartie joueur = partie.getJoueurActifbyUUID(uuid_joueur_actif);
+		JoueurPartie opposant = partie.getOpposant(joueur);
 		
 		
 		CardSnapshot snap = joueur.getCardFromHandByUuid(UUID.fromString(card_uuid));
@@ -242,7 +241,7 @@ public class GameService {
 		}
 		
 		//4 devait il attaquer. est ce que son slot gauche contenait une unité
-		JoueurPartie joueur = getJoueurActif(partie, uuid_joueur_actif);
+		JoueurPartie joueur = partie.getJoueurActifbyUUID(uuid_joueur_actif);
 		
 		
 		CardInPlay cip = joueur.getPlateau().get(slot);
@@ -266,7 +265,7 @@ public class GameService {
 		partie.setEtat_partie(EtatPartie.RUNNING);
 		
 		if (nextPhase  == PhasePartie.TURN_END)
-			endOfTurnPhase(partie, joueur,getOpposant(partie, joueur));
+			endOfTurnPhase(partie, joueur,partie.getOpposant(joueur));
 		
 		partieDao.update(partie);
 	    return partie.getGamestate();
@@ -291,8 +290,8 @@ public class GameService {
 			    throw new GameActionException("Phase mismatch : " + partie.getPhase_partie() + " / " + slot);
 		}
 		//4 devait il attaquer. est ce que son slot gauche contenait une unité
-		JoueurPartie joueur = getJoueurActif(partie, uuid_joueur_actif);
-		JoueurPartie opposant = getOpposant(partie, joueur);
+		JoueurPartie joueur = partie.getJoueurActifbyUUID(uuid_joueur_actif);
+		JoueurPartie opposant = partie.getOpposant(joueur);
 		CardInPlay cip = joueur.getPlateau().get(slot);
 		if (cip == null || cip.cardType != CardType.UNIT)throw new GameActionException("only unit attack "+cip.snapshotId+" / "+source);
 		
@@ -346,11 +345,12 @@ public class GameService {
 		if (!uuid_joueur_actif.equals(partie.getJoueur_actif()))   throw new GameActionException("joueur actif != playerid");
 		if (partie.getEtat_partie() != EtatPartie.RESOLVE_EFFECT)  throw new GameActionException("Not in Resolve state");
 	    
-		EffectToResolve etr= partie.getGamestate().getCurrentEffect();
 		
-		JoueurPartie joueur=getJoueurActif(partie, uuid_joueur_actif);
 		
-		effectService.handleResolveEffect(partie,joueur,getOpposant(partie, joueur),etr,cards);
+		
+		JoueurPartie joueur=partie.getJoueurActifbyUUID(uuid_joueur_actif);
+		
+		effectService.handleResolveEffect(partie,joueur,partie.getOpposant(joueur),partie.getGamestate().getCurrentEffect(),cards);
 		
 		//check à faire si poursuite ou pas.
 		
@@ -449,29 +449,6 @@ public class GameService {
 	}
 	
 	
-	
-	
-	
-	
-	private JoueurPartie getJoueurActif(Partie partie, UUID joueur_id) {
-		if (joueur_id.equals(partie.getJ1().getOwner().getId_joueur()))	
-			return partie.getJ1();
-		return partie.getJ2();
-
-	}
-	
-	@SuppressWarnings("unused")
-	private JoueurPartie getOpposant(Partie partie, UUID joueur_id) {
-		if (joueur_id.equals(partie.getJ1().getOwner().getId_joueur()))	
-			return partie.getJ2();
-		return partie.getJ1();
-	}
-	private JoueurPartie getOpposant(Partie partie, JoueurPartie joueur) {
-		if (partie.getJ1() == joueur)	
-			return partie.getJ2();
-		return partie.getJ1();
-	}
-	
 	private void continueFlow(Partie partie,JoueurPartie joueur,JoueurPartie opposant) {
 
 // 1️⃣ PRIORITÉ ABSOLUE : effets à résoudre
@@ -487,6 +464,7 @@ public class GameService {
 			JoueurPartie tmp = joueur;
 		    joueur = opposant;
 		    opposant = tmp;
+		    partie.getGamestate().joueur_tour = joueur.getOwner().getId_joueur();
 		    partie.setJoueur_actif(joueur.getOwner().getId_joueur());
 			startOfTurnPhase(partie, joueur, opposant);
 			continueFlow(partie, joueur, opposant);
@@ -522,7 +500,7 @@ public class GameService {
 	private void checkvictory(Partie partie, JoueurPartie joueur_mort) {
 		System.out.println("GameService.checkvictory");
 		if (joueur_mort.getHp()>0) throw new GameActionException("bizarre, il est pas mort..."); 
-		JoueurPartie joueur_victorieux = getOpposant(partie, joueur_mort);
+		JoueurPartie joueur_victorieux = partie.getOpposant(joueur_mort);
 		LogEvent log = new LogEvent(joueur_victorieux.getOwner().getPseudo()+" gagne la partie",joueur_victorieux.getOwner().getPseudo()+" win the game",joueur_victorieux.getOwner().getId_joueur().toString(),null,null,null);
 		partie.getGamestate().log.add(log);
 		partie.increaseStep();

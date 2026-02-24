@@ -17,6 +17,7 @@ public class GameState {
 	public EtatPartie etat_partie;
 	public PhasePartie phase_partie;
 	public UUID joueur_actif;
+	public UUID joueur_tour; //car parfois le joueur actif n'est pas celui dont c'est le tour
 	
 	public int tour;
 	public int step;

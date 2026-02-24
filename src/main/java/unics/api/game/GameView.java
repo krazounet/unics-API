@@ -21,4 +21,5 @@ public class GameView {
     
     public List<LogEvent> logs;
     public EffectToResolve current_effect;
+    public UUID joueur_tour;
 }

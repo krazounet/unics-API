@@ -1,11 +1,11 @@
 package unics.api.game.service;
 
 import java.util.List;
-import java.util.Set;
+import java.util.UUID;
 
 import unics.Enum.AbilityType;
-import unics.Enum.EffectConstraint;
 import unics.api.game.EffectToResolve;
+import unics.api.game.GameActionException;
 import unics.game.EtatPartie;
 import unics.game.JoueurPartie;
 import unics.game.Partie;
@@ -15,14 +15,30 @@ public class EffectService {
 
 	private final AbilityService abilityService;
 	private final ContrainteService contrainteService;
+	private final PlateauService plateauService;
 	
-	public EffectService(AbilityService abilityService, ContrainteService contrainteService) {
-		this.abilityService = abilityService;
-		this.contrainteService = contrainteService;
+	public EffectService(AbilityService abilityService, ContrainteService contrainteService,PlateauService plateauService) {
+		this.abilityService 	= abilityService;
+		this.contrainteService 	= contrainteService;
+		this.plateauService		= plateauService;
 	}
 
 	public void handleResolveEffect(Partie partie, JoueurPartie joueur, JoueurPartie opposant, EffectToResolve etr,List<String> cards) {
+		//check si bon nombre de cible.
+		EffectSnapshot es = etr.getEffet_source();
 		
+		
+		int max_cible_attendue = get_max_cibles_attendues(es.ability,es.value);
+		if (max_cible_attendue < cards.size()) throw new GameActionException("trop de cible(s)");
+		
+		//OQP des contraintes.
+		//Est ce que c'est une contrainte de possession ou de ciblage ?
+		boolean is_constraint_respected = contrainteService.is_all_constraint_respected(partie, joueur, opposant, etr);
+		
+		
+		boolean is_ability_negative_for_owner = es.ability.isNegativeForOwner();
+		int nb_target = plateauService.get_nb_cards_on_board(joueur);
+		//
 		
 	}
 
@@ -36,19 +52,8 @@ public class EffectService {
 			System.out.println("handleResolveEffect : "+partie.getGamestate().getCurrentEffect().getEffet_source().ability);
 			EffectToResolve current = partie.getGamestate().getCurrentEffect();
 			EffectSnapshot es = current.getEffet_source();
-
-			boolean is_constraint_respected = true;
-			//si des contraintes sont pas respectable : on vide l'effet.
-			Set<EffectConstraint> ec = es.constraints;
-			if (ec.size() == 0) is_constraint_respected = true;
-			else {
-				for (EffectConstraint constraint : ec) {
-				    // traitement
-				    boolean respected = contrainteService.is_Constraint_respected(partie,joueur,opposant,constraint,current);
-				    if (!respected) {is_constraint_respected = false;break;}
-				}
-			}
 			
+			boolean is_constraint_respected = contrainteService.is_all_constraint_respected(partie, joueur, opposant, current);
 			
 			AbilityType at = es.ability;
 			boolean required_target = at.requiresTarget();
@@ -92,4 +97,19 @@ public class EffectService {
 		}
 		
 	}
+
+	public int get_max_cibles_attendues(AbilityType ability, Integer value) {
+		switch (ability) {
+		case BUFF,DAMAGE_UNIT_ALLY,DAMAGE_UNIT_ENEMY,DEBUFF_ALLY,DEBUFF_ENEMY :
+			return 1; 
+		case DESTROY_STRUCTURE_ENEMY,DESTROY_UNIT_ENEMY,MOVE_ALLY,MOVE_ENEMY,TAP_ALLY,TAP_ENEMY,UNTAP_ALLY,UNTAP_ENEMY :
+			return value;
+		
+		default : return 0;
+		}
+		
+	}
+	
+	
+	
 }

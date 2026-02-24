@@ -141,6 +141,23 @@ public class Partie {
 			return J1;
 		return J2;
 	}
+	public JoueurPartie getJoueurActifbyUUID(UUID joueur_id) {
+		if (joueur_id.equals(getJ1().getOwner().getId_joueur()))	
+			return getJ1();
+		return getJ2();
+	
+	}
+	@SuppressWarnings("unused")
+	private JoueurPartie getOpposant(UUID joueur_id) {
+		if (joueur_id.equals(getJ1().getOwner().getId_joueur()))	
+			return getJ2();
+		return getJ1();
+	}
+	public JoueurPartie getOpposant(JoueurPartie joueur) {
+		if (getJ1() == joueur)	
+			return getJ2();
+		return getJ1();
+	}
 	
 	
 }
